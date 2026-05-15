@@ -49,7 +49,15 @@
     - 대표주관회사
 - DART → 공시 정보 (토글 정보로 개요 긴 것들을 보여주는 용도)
     - 개요 → 사실 나열
-## 4단계 : 와이어프레임(작성중)
-![와이어프레임](./wireframe.png)
+## 4단계 : 와이어프레임
+![와이어프레임](/images/wireframe.png)
 
-MVP, ERD, API 명세서 작성 예정
+## 5단계 : 스프린트 계획
+![프로덕트 백로그](/images/product_backlog.png)
+![스프린트 계획](/images/sprint20260515.png)
+
+## 6단계 : ERD
+![ERD](/images/ERD.jpg)
+
+## 협업 자료
+- [Notion](https://www.notion.so/pastjung/SSAFY-2026-05-08-2026-06-26-35aef948eae48060bccddfae31b7f6a5?source=copy_link)
