@@ -1,4 +1,17 @@
 services:
+  db:
+    container_name: postgres
+    image: pgvector/pgvector:pg16
+    volumes:
+      - ./data-pjt/postgres_data:/var/lib/postgresql/data
+      - ./data-pjt/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    env_file:
+      - .env
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    networks:
+      - de_net
+
   backend:
     build:
       context: ./backend-pjt
@@ -10,6 +23,11 @@ services:
     env_file:
       - .env
     command: python manage.py runserver 0.0.0.0:8000
+    depends_on:
+      - db
+    networks:
+      - de_net
+      - web_net
 
   frontend:
     build:
@@ -23,3 +41,11 @@ services:
     command: npm run dev -- --host
     depends_on:
       - backend
+    networks:
+      - web_net
+
+networks:
+  de_net:
+    driver: bridge
+  web_net:
+    driver: bridge
