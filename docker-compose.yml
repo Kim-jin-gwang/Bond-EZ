@@ -1,4 +1,16 @@
 services:
+  backend:
+    build:
+      context: ./backend-pjt
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./backend-pjt:/app
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    env_file:
+      - .env
+    command: python manage.py runserver 0.0.0.0:8000
+
   frontend:
     build:
       context: ./frontend-pjt
