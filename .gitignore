@@ -1,2 +1,15 @@
 .env
 postgres_data
+
+# Airflow logs and temp files
+data-pjt/airflow/logs/
+data-pjt/airflow/plugins/__pycache__/
+data-pjt/airflow/dags/__pycache__/
+
+# PostgreSQL actual data
+data-pjt/postgres_data/
+
+# Python cache
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
