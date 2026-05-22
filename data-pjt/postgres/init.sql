@@ -1,3 +1,11 @@
+-- 0. bonds_db 및 airflow 데이터베이스 생성
+CREATE DATABASE bonds_db;
+CREATE DATABASE airflow;
+
+-- ssafyuser에게 권한 부여를 위한 추가 설정
+ALTER DATABASE bonds_db OWNER TO ssafyuser;
+ALTER DATABASE airflow OWNER TO ssafyuser;
+
 -- 1. pgvector 확장 활성화
 -- embedding VECTOR(1536) 타입을 사용하기 위해 필요
 CREATE EXTENSION IF NOT EXISTS vector;

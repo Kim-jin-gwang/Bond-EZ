@@ -4,16 +4,18 @@ import feedparser
 from bs4 import BeautifulSoup
 import psycopg2
 from datetime import datetime
+import os
 
 RSS_FEED_URL = "https://www.khan.co.kr/rss/rssdata/total_news.xml"
 
 # PostgreSQL 연결 
 def get_connection():
     return psycopg2.connect(
-        host="localhost",
-        dbname="news",
-        user="ssafyuser",
-        password="ssafy"
+        host=os.getenv("DB_HOST", "db"),
+        dbname=os.getenv("POSTGRES_DB", "news"),
+        user=os.getenv("POSTGRES_USER", "ssafyuser"),
+        password=os.getenv("POSTGRES_PASSWORD", "ssafy"),
+        port=os.getenv("DB_PORT", "5432")
     )
 
 # DB INSERT
