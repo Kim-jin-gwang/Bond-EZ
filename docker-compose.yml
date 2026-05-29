@@ -94,6 +94,9 @@ services:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/airflow
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__CORE__DEFAULT_TIMEZONE=Asia/Seoul
+      - AIRFLOW__WEBSERVER__DEFAULT_UI_TIMEZONE=Asia/Seoul
+      - TZ=Asia/Seoul
       - _PIP_ADDITIONAL_REQUIREMENTS=${AIRFLOW_PIP_DEPS:-kafka-python python-dotenv requests pyspark psycopg2-binary}
     env_file:
       - .env
@@ -119,6 +122,9 @@ services:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/airflow
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__CORE__DEFAULT_TIMEZONE=Asia/Seoul
+      - AIRFLOW__WEBSERVER__DEFAULT_UI_TIMEZONE=Asia/Seoul
+      - TZ=Asia/Seoul
       - _PIP_ADDITIONAL_REQUIREMENTS=${AIRFLOW_PIP_DEPS:-kafka-python python-dotenv requests pyspark psycopg2-binary}
     env_file:
       - .env
@@ -141,6 +147,9 @@ services:
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/airflow
+      - AIRFLOW__CORE__DEFAULT_TIMEZONE=Asia/Seoul
+      - AIRFLOW__WEBSERVER__DEFAULT_UI_TIMEZONE=Asia/Seoul
+      - TZ=Asia/Seoul
       - _AIRFLOW_DB_UPGRADE=true
       - _AIRFLOW_WWW_USER_CREATE=true
       - _AIRFLOW_WWW_USER_USERNAME=${AIRFLOW_USERNAME:-admin}
@@ -149,6 +158,76 @@ services:
     env_file:
       - .env
     command: version
+    networks:
+      - de_net
+
+  # --- Flink ---
+  flink-jobmanager:
+    build:
+      context: .
+      dockerfile: data-pjt/flink/Dockerfile.flink
+    container_name: flink-jobmanager
+    ports:
+      - "8082:8081"
+    command: jobmanager
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: flink-jobmanager
+    networks:
+      - de_net
+
+  flink-taskmanager:
+    build:
+      context: .
+      dockerfile: data-pjt/flink/Dockerfile.flink
+    container_name: flink-taskmanager
+    depends_on:
+      - flink-jobmanager
+    command: taskmanager
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: flink-jobmanager
+        taskmanager.numberOfTaskSlots: 2
+    networks:
+      - de_net
+
+  # --- News Collection Pipeline ---
+  news-crawler:
+    build:
+      context: ./data-pjt
+      dockerfile: Dockerfile.dev
+    container_name: news-crawler
+    depends_on:
+      - kafka
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+    volumes:
+      - ./data-pjt:/app
+    command: python producer/news_crawler.py
+    networks:
+      - de_net
+
+  flink-job-submitter:
+    build:
+      context: .
+      dockerfile: data-pjt/flink/Dockerfile.flink
+    container_name: flink-job-submitter
+    depends_on:
+      - flink-jobmanager
+      - db
+    volumes:
+      - ./data-pjt:/app
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - POSTGRES_DB=bonds_db
+      - POSTGRES_USER=ssafyuser
+      - POSTGRES_PASSWORD=ssafy
+      - DB_HOST=db
+      - DB_PORT=5432
+    command: >
+      bash -c "sleep 15 && flink run -m flink-jobmanager:8081 -py /app/flink/news_processor.py"
     networks:
       - de_net
 

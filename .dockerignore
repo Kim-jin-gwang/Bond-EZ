@@ -1,0 +1,11 @@
+data-pjt/airflow/logs/
+data-pjt/airflow/plugins/
+data-pjt/postgres_data/
+data-pjt/postgres/pg_data/
+backend-pjt/__pycache__/
+frontend-pjt/node_modules/
+frontend-pjt/dist/
+__pycache__/
+*.pyc
+.env
+.git/
