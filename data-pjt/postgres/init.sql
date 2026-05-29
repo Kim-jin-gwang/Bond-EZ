@@ -32,19 +32,15 @@ GRANT ALL PRIVILEGES ON FUNCTIONS TO ssafyuser;
 -- 5. news_article 테이블 생성
 CREATE TABLE IF NOT EXISTS news_article (
     id SERIAL PRIMARY KEY,
-    title VARCHAR(200) NOT NULL,
-    writer VARCHAR(255) NOT NULL,
+    title VARCHAR(500) NOT NULL,
+    source VARCHAR(100) NOT NULL,
+    url VARCHAR(500) UNIQUE NOT NULL,
     write_date TIMESTAMP NOT NULL,
-    category VARCHAR(50) NOT NULL,
-    content TEXT NOT NULL,
-    url VARCHAR(200) UNIQUE NOT NULL,
-    keywords JSON DEFAULT '[]'::json,
-    embedding VECTOR(1536) NULL
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-
 -- 6. 현재 존재하는 객체에 대한 권한 부여
--- 위에서 생성한 news_article 테이블과 관련 시퀀스에도 적용됨
+-- 위에서 생성한 테이블과 관련 시퀀스에도 적용됨
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO ssafyuser;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO ssafyuser;
 GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO ssafyuser;

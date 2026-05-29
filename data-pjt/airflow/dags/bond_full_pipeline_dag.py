@@ -33,7 +33,7 @@ def fetch_and_produce_bond_data():
         acks='all'
     )
     topic = 'topic_bond_raw'
-    base_url = "http://apis.data.go.kr/1160100/service/GetBondIssuInfoService/getBondIssuInfo"
+    base_url = "http://apis.data.go.kr/1160100/GetBondIssuInfoService_V2/getBondBasiInfo_V2"
     
     total_count = 1000
     page_size = 100
@@ -56,6 +56,7 @@ def fetch_and_produce_bond_data():
             time.sleep(1)
         except Exception as e:
             print(f"Error at page {page}: {e}")
+            raise e  # Fail the task if API call fails
     producer.close()
 
 # --- 2. Spark 가공 함수 ---
@@ -89,7 +90,12 @@ def run_spark_bond_batch():
             except: return len(rating_order)
         return max(ratings, key=rating_index)
 
-    raw_df = spark.read.format("kafka").option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVERS).option("subscribe", "topic_bond_raw").option("startingOffsets", "earliest").load()
+    raw_df = spark.read.format("kafka") \
+        .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVERS) \
+        .option("subscribe", "topic_bond_raw") \
+        .option("startingOffsets", "earliest") \
+        .option("allowNonExistentTopics", "true") \
+        .load()
     parsed_df = raw_df.selectExpr("CAST(value AS STRING)").select(from_json(col("value"), kafka_schema).alias("data")).select("data.*")
 
     final_df = parsed_df \
@@ -110,7 +116,8 @@ def run_spark_bond_batch():
         .withColumn("guarantee_status", col("grnDcdNm")) \
         .withColumn("underwriter", col("bondUndtInstNm")) \
         .withColumn("credit_rating", get_lowest_rating(col("kisScrsItmsKcdNm"), col("kbpScrsItmsKcdNm"), col("niceScrsItmsKcdNm"), col("fnScrsItmsKcdNm"))) \
-        .select("isin_code", "bond_name", "company_id", "company_name", "industry", "issue_date", "maturity_date", "coupon_rate", "issue_amount", "bond_type", "seniority", "call_put_option", "interest_type", "payment_cycle", "guarantee_status", "underwriter", "credit_rating")
+        .select("isin_code", "bond_name", "company_id", "company_name", "industry", "issue_date", "maturity_date", "coupon_rate", "issue_amount", "bond_type", "seniority", "call_put_option", "interest_type", "payment_cycle", "guarantee_status", "underwriter", "credit_rating") \
+        .dropDuplicates(["isin_code"])
 
     JDBC_URL = f"jdbc:postgresql://{DB_HOST}:{DB_PORT}/{POSTGRES_DB}"
     JDBC_PROPERTIES = {"user": POSTGRES_USER, "password": POSTGRES_PASSWORD, "driver": "org.postgresql.Driver"}

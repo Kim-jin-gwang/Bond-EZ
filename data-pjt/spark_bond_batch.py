@@ -1,3 +1,13 @@
+'''
+Spark 로직을 단독으로 실행하기 위해 만든 스크립트
+Airflow에 올리기 전 로컬로 테스트할 때 사용합니다.
+
+
+
+'''
+
+
+
 import os
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, from_json, when, udf, regexp_replace, to_date, least, greatest
