@@ -15,6 +15,7 @@ const currentPage = ref('home')
 const currentSubPage = ref(null)
 const selectedIndicatorId = ref('treasury-rate')
 const marketSearch = ref(null)
+const compareBonds = ref([])
 const isLoggedIn = ref(false)
 const user = ref({
   name: '윤투자',
@@ -59,7 +60,7 @@ function readRoute() {
   return { page, subPage, indicatorId }
 }
 
-function applyRoute(page, subPage, indicatorId, searchPayload) {
+function applyRoute(page, subPage, indicatorId, searchPayload, comparePayload) {
   currentPage.value = page
   currentSubPage.value = subPage
 
@@ -70,12 +71,17 @@ function applyRoute(page, subPage, indicatorId, searchPayload) {
   if (page === 'market') {
     marketSearch.value = searchPayload?.source === 'search' ? searchPayload : null
   }
+
+  if (page === 'compare') {
+    compareBonds.value = comparePayload?.bonds || compareBonds.value
+  }
 }
 
 function navigate(page, payload, options = {}) {
   let subPage = null
   let indicatorId = selectedIndicatorId.value
   let searchPayload = marketSearch.value
+  let comparePayload = null
 
   if (page === 'guide') {
     subPage = payload || 'what'
@@ -83,11 +89,13 @@ function navigate(page, payload, options = {}) {
     indicatorId = payload || selectedIndicatorId.value
   } else if (page === 'market') {
     searchPayload = payload
+  } else if (page === 'compare') {
+    comparePayload = payload
   }
 
-  applyRoute(page, subPage, indicatorId, searchPayload)
+  applyRoute(page, subPage, indicatorId, searchPayload, comparePayload)
 
-  const state = { page, subPage, indicatorId, searchPayload }
+  const state = { page, subPage, indicatorId, searchPayload, comparePayload }
   const hash = buildHash(page, subPage, indicatorId)
 
   if (options.replace) {
@@ -114,7 +122,8 @@ function handlePopState() {
     state?.page || route.page,
     state?.subPage || route.subPage,
     state?.indicatorId || route.indicatorId,
-    state?.searchPayload || null
+    state?.searchPayload || null,
+    state?.comparePayload || null
   )
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
@@ -138,6 +147,7 @@ onBeforeUnmount(() => {
         :is="pages[currentPage]"
         :selected-indicator-id="selectedIndicatorId"
         :market-search="marketSearch"
+        :compare-bonds="compareBonds"
         :is-logged-in="isLoggedIn"
         :user="user"
         :current-sub-page="currentSubPage"

@@ -11,9 +11,9 @@ const props = defineProps({
   },
 })
 
-// 필터 상태 관리
 const filtersOpen = ref(false)
 const searchKeyword = ref(props.marketSearch?.keyword || '')
+const selectedBondCodes = ref([])
 const selectedFilters = ref({
   bondTypes: props.marketSearch?.filters?.bondTypes || [],
   maturities: props.marketSearch?.filters?.maturities || [],
@@ -23,36 +23,21 @@ const selectedFilters = ref({
 })
 
 const filterGroups = [
-  {
-    key: 'bondTypes',
-    label: '채권 종류',
-    options: ['국채', '회사채', '금융채'],
-  },
-  {
-    key: 'maturities',
-    label: '만기',
-    options: ['1년 이하', '1~3년', '3~5년', '5~10년', '10년 이상'],
-  },
-  {
-    key: 'yields',
-    label: '수익률',
-    options: ['3% 이상', '4% 이상', '5% 이상', '6% 이상'],
-  },
-  {
-    key: 'ratings',
-    label: '신용등급',
-    options: ['AAA', 'AA', 'A', 'BBB'],
-  },
-  {
-    key: 'interestCycles',
-    label: '이자 지급 주기',
-    options: ['3개월', '6개월', '12개월', '만기일시'],
-  },
+  { key: 'bondTypes', label: '채권 종류', options: ['국채', '회사채', '금융채'] },
+  { key: 'maturities', label: '만기', options: ['1년 이하', '1~3년', '3~5년', '5~10년', '10년 이상'] },
+  { key: 'yields', label: '수익률', options: ['3% 이상', '4% 이상', '5% 이상', '6% 이상'] },
+  { key: 'ratings', label: '신용등급', options: ['AAA', 'AA', 'A', 'BBB'] },
+  { key: 'interestCycles', label: '이자 지급 주기', options: ['3개월', '6개월', '12개월', '만기일시'] },
 ]
 
-const compareActive = ref(false)
+const selectedBonds = computed(() =>
+  selectedBondCodes.value
+    .map((code) => bonds.find((bond) => bond.code === code))
+    .filter(Boolean),
+)
 
-// Props 변경 시 로컬 상태 동기화
+const canCompare = computed(() => selectedBondCodes.value.length === 2)
+
 watch(() => props.marketSearch, (newVal) => {
   if (newVal) {
     searchKeyword.value = newVal.keyword || ''
@@ -129,11 +114,40 @@ function resetFilters() {
     interestCycles: [],
   }
 }
+
+function isBondSelected(code) {
+  return selectedBondCodes.value.includes(code)
+}
+
+function isSelectionDisabled(code) {
+  return !isBondSelected(code) && selectedBondCodes.value.length >= 2
+}
+
+function toggleBondSelection(code) {
+  if (isBondSelected(code)) {
+    selectedBondCodes.value = selectedBondCodes.value.filter((selectedCode) => selectedCode !== code)
+    return
+  }
+
+  if (selectedBondCodes.value.length < 2) {
+    selectedBondCodes.value = [...selectedBondCodes.value, code]
+  }
+}
+
+function compareSelectedBonds() {
+  if (!canCompare.value) {
+    return
+  }
+
+  emit('navigate', 'compare', {
+    source: 'market',
+    bonds: selectedBonds.value,
+  })
+}
 </script>
 
 <template>
   <section class="page market-page">
-    <!-- 검색 및 필터 섹션 -->
     <section class="search-panel market-search">
       <div class="search-box">
         <span aria-hidden="true">⌕</span>
@@ -161,8 +175,15 @@ function resetFilters() {
       <div class="market-info">
         <p class="eyebrow">전체 채권 시세</p>
         <h1>{{ filteredBonds.length }}개의 채권이 검색되었습니다</h1>
+        <p class="selection-help">비교할 채권을 최대 2개까지 선택하세요. 현재 {{ selectedBondCodes.length }}/2개 선택</p>
       </div>
-      <button class="compare-fab" :class="{ enabled: compareActive }" type="button" @click="$emit('navigate', 'compare')">
+      <button
+        class="compare-fab"
+        :class="{ enabled: canCompare }"
+        type="button"
+        :disabled="!canCompare"
+        @click="compareSelectedBonds"
+      >
         비교하기
       </button>
     </div>
@@ -177,12 +198,19 @@ function resetFilters() {
             <th>현재가</th>
             <th>등락률</th>
             <th>매수/매도 수익률</th>
-            <th>액션</th>
+            <th>옵션</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="bond in filteredBonds" :key="bond.code">
-            <td><input v-model="compareActive" type="checkbox" /></td>
+          <tr v-for="bond in filteredBonds" :key="bond.code" :class="{ selected: isBondSelected(bond.code) }">
+            <td>
+              <input
+                type="checkbox"
+                :checked="isBondSelected(bond.code)"
+                :disabled="isSelectionDisabled(bond.code)"
+                @change="toggleBondSelection(bond.code)"
+              />
+            </td>
             <td>
               <div class="bond-name-cell">
                 <strong>{{ bond.name }}</strong>
@@ -216,10 +244,10 @@ function resetFilters() {
 <style scoped>
 .market-search {
   margin-bottom: 32px;
-  background: white;
   padding: 24px;
-  border-radius: 16px;
   border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
 }
 
 .market-toolbar {
@@ -230,9 +258,23 @@ function resetFilters() {
 }
 
 .market-info h1 {
+  margin: 4px 0 6px;
   font-size: 20px;
   font-weight: 800;
-  margin-top: 4px;
+}
+
+.selection-help {
+  margin-bottom: 0;
+  font-size: 14px;
+}
+
+.compare-fab:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+tr.selected {
+  background: #f3faf9;
 }
 
 .bond-name-cell {
@@ -242,25 +284,25 @@ function resetFilters() {
 }
 
 .bond-name-cell .code {
-  font-size: 12px;
   color: var(--muted);
+  font-size: 12px;
 }
 
 .market-badge {
-  font-size: 11px;
-  padding: 2px 6px;
   border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
   font-weight: 600;
 }
 
 .market-badge.internal {
-  background: #eef4f8;
   color: var(--primary);
+  background: #eef4f8;
 }
 
 .market-badge.external {
-  background: #fff7ec;
   color: var(--accent);
+  background: #fff7ec;
 }
 
 .filter-actions {
@@ -273,11 +315,11 @@ function resetFilters() {
 }
 
 .btn-reset {
-  background: transparent;
-  border: none;
+  border: 0;
   color: var(--muted);
-  text-decoration: underline;
+  background: transparent;
   font-size: 14px;
+  text-decoration: underline;
 }
 
 .empty-msg {
@@ -287,12 +329,12 @@ function resetFilters() {
 
 .empty-msg button {
   margin-top: 12px;
-  color: var(--primary);
-  font-weight: 600;
-  background: transparent;
   border: 1px solid var(--primary);
-  padding: 8px 16px;
   border-radius: 8px;
+  padding: 8px 16px;
+  color: var(--primary);
+  background: transparent;
+  font-weight: 600;
 }
 
 .price {
