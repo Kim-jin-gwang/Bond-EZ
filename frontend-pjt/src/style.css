@@ -1044,6 +1044,14 @@ td span {
 }
 
 @media (max-width: 960px) {
+  .home-hero {
+    grid-template-columns: minmax(0, 1fr) !important;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    min-height: auto;
+  }
+
   .gnb,
   .section-title,
   .toolbar,

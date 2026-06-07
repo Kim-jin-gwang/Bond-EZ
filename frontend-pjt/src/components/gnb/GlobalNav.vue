@@ -21,8 +21,8 @@ const navItems = [
 <template>
   <header class="gnb">
     <button class="brand" type="button" aria-label="홈으로 이동" @click="$emit('navigate', 'home')">
-      <span class="brand-mark">易</span>
-      <span>채권이지</span>
+      <span class="brand-mark">B</span>
+      <span>BondEZ</span>
     </button>
 
     <nav class="nav-links" aria-label="Global Navigation Bar">

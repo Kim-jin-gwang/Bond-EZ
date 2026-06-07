@@ -1,6 +1,6 @@
 export const bonds = [
   {
-    name: '산금채 20신복2000-0113-1',
+    name: '한국전력채권 2040-01',
     code: 'KR310201DA16',
     type: '금융채',
     price: '10,185',
