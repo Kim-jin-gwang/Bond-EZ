@@ -4,7 +4,7 @@ set -eu
 # 스크립트를 어디서 실행하든 프로젝트 루트 기준으로 동작하게 이동합니다.
 cd "$(dirname "$0")"
 
-# docker compose 서비스 이름입니다. docker-compose.yml의 services 키와 맞아야 합니다.
+# docker compose 명령어 설정
 COMPOSE="docker compose"
 DB_SERVICE="db"
 BACKEND_SERVICE="backend"
@@ -40,10 +40,9 @@ env_value_or_default() {
 }
 
 # DB처럼 healthcheck가 있는 서비스가 준비될 때까지 기다립니다.
-# Postgres는 최초 실행 시 init.sql, DB 생성 등을 마친 뒤에야 안전하게 접속할 수 있습니다.
 wait_for_healthy() {
   service="$1"
-  timeout="${2:-90}"
+  timeout="${2:-120}"
   elapsed=0
 
   # compose 서비스 이름으로 실제 컨테이너 ID를 찾습니다.
@@ -54,7 +53,6 @@ wait_for_healthy() {
   fi
 
   while [ "$elapsed" -lt "$timeout" ]; do
-    # healthcheck가 없으면 none, 준비 중이면 starting, 성공하면 healthy가 됩니다.
     health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_id")"
 
     if [ "$health" = "healthy" ] || [ "$health" = "none" ]; then
@@ -76,56 +74,59 @@ wait_for_healthy() {
   exit 1
 }
 
-# Docker CLI가 없으면 이후 명령이 전부 실패하므로 먼저 확인합니다.
+# Docker 확인
 if ! command_exists docker; then
-  error "Docker is not installed or not available in PATH."
+  error "Docker is not installed."
   exit 1
 fi
 
-# 이 프로젝트는 docker compose v2 형식의 명령을 사용합니다.
-if ! docker compose version >/dev/null 2>&1; then
-  error "'docker compose' is not available. Please install Docker Compose v2."
+if ! $COMPOSE version >/dev/null 2>&1; then
+  error "Docker Compose v2 is required."
   exit 1
 fi
 
-# 협업자가 처음 clone한 경우를 위해 .env.example을 복사해 기본 .env를 만듭니다.
+# .env 준비
 if [ ! -f ".env" ]; then
   if [ -f ".env.example" ]; then
     info ".env was not found. Creating it from .env.example."
     cp .env.example .env
   else
-    error ".env was not found, and .env.example does not exist."
+    error ".env.example not found."
     exit 1
   fi
 fi
 
-# Docker 캐시를 사용하므로 변경이 없으면 빠르게 지나갑니다.
-# requirements.txt, package.json, Dockerfile 변경을 사람이 판단하지 않아도 됩니다.
-info "Building Docker images. Docker will reuse cache when nothing changed."
-$COMPOSE build "$BACKEND_SERVICE" "$FRONTEND_SERVICE"
+# 1. 전체 프로젝트 빌드
+info "Building all Docker images (this may take a while)..."
+$COMPOSE build
 
-# backend가 DB에 너무 빨리 접속하지 않도록 DB부터 먼저 실행합니다.
-info "Starting database."
-$COMPOSE up -d "$DB_SERVICE"
+# 2. 인프라 서비스 먼저 실행 (DB, Kafka)
+info "Starting infrastructure services (DB, Zookeeper, Kafka)..."
+$COMPOSE up -d db zookeeper kafka
 
-# healthcheck가 healthy가 될 때까지 기다린 뒤 backend를 실행합니다.
-info "Waiting for database healthcheck."
-wait_for_healthy "$DB_SERVICE" 120
+# 3. DB 준비 대기 (Airflow와 Backend가 DB에 의존함)
+info "Waiting for database to be healthy..."
+wait_for_healthy "$DB_SERVICE"
 
-# DB 준비가 끝났으므로 Django와 Vite 개발 서버를 실행합니다.
-info "Starting backend and frontend."
-$COMPOSE up -d "$BACKEND_SERVICE" "$FRONTEND_SERVICE"
+# 4. 나머지 모든 서비스 실행 (Crawler, Airflow, Spark, Flink, Web)
+info "Starting all remaining pipeline and application services..."
+$COMPOSE up -d
 
-# 새 DB이거나 migration이 추가된 경우를 위해 항상 migrate를 실행합니다.
-# 이미 적용된 migration은 Django가 알아서 건너뜁니다.
-info "Applying Django migrations."
+# 5. Django 마이그레이션 실행
+info "Applying Django migrations..."
 $COMPOSE exec "$BACKEND_SERVICE" python manage.py migrate
 
-# .env에 포트가 지정되어 있으면 그 값을, 없으면 compose 기본값을 출력합니다.
+# 접속 정보 출력
 FRONTEND_PORT="$(env_value_or_default FRONTEND_PORT 5173)"
 BACKEND_PORT="$(env_value_or_default BACKEND_PORT 8000)"
 
-info "Done."
-printf 'Frontend: http://localhost:%s\n' "$FRONTEND_PORT"
-printf 'Backend : http://localhost:%s\n' "$BACKEND_PORT"
-printf '\nUse "docker compose logs -f" to watch logs.\n'
+info "Deployment Complete!"
+printf '--------------------------------------------------\n'
+printf '🚀 Services are running at:\n'
+printf '  - Frontend      : http://localhost:%s\n' "$FRONTEND_PORT"
+printf '  - Backend API   : http://localhost:%s\n' "$BACKEND_PORT"
+printf '  - Airflow UI    : http://localhost:8081\n'
+printf '  - Spark Master  : http://localhost:8080\n'
+printf '  - Flink UI      : http://localhost:8082\n'
+printf '--------------------------------------------------\n'
+printf 'Use "docker compose logs -f" to watch logs.\n'
