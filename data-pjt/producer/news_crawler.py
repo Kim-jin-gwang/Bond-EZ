@@ -10,10 +10,22 @@ from datetime import datetime
 KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
 TOPIC_NAME = "topic_news_raw"
 
-producer = KafkaProducer(
-    bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
-    value_serializer=lambda v: json.dumps(v).encode('utf-8')
-)
+def get_kafka_producer(retries=20, delay=5):
+    """Wait for Kafka to be ready and return a producer instance."""
+    for i in range(retries):
+        try:
+            producer = KafkaProducer(
+                bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
+                value_serializer=lambda v: json.dumps(v).encode('utf-8')
+            )
+            print("Successfully connected to Kafka.")
+            return producer
+        except Exception as e:
+            print(f"Waiting for Kafka... ({i+1}/{retries}) - {e}")
+            time.sleep(delay)
+    raise Exception("Failed to connect to Kafka after multiple retries.")
+
+producer = get_kafka_producer()
 
 def scrape_naver_finance():
     """Naver Finance Main News Scraper"""
