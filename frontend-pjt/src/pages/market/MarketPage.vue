@@ -20,6 +20,8 @@ const selectedFilters = ref({
   yields: props.marketSearch?.filters?.yields || [],
   ratings: props.marketSearch?.filters?.ratings || [],
   interestCycles: props.marketSearch?.filters?.interestCycles || [],
+  optionTypes: props.marketSearch?.filters?.optionTypes || [],
+  seniorities: props.marketSearch?.filters?.seniorities || [],
 })
 
 const filterGroups = [
@@ -28,6 +30,8 @@ const filterGroups = [
   { key: 'yields', label: '수익률', options: ['3% 이상', '4% 이상', '5% 이상', '6% 이상'] },
   { key: 'ratings', label: '신용등급', options: ['AAA', 'AA', 'A', 'BBB'] },
   { key: 'interestCycles', label: '이자 지급 주기', options: ['3개월', '6개월', '12개월', '만기일시'] },
+  { key: 'optionTypes', label: '옵션', options: ['CALL', 'PUT', '없음'] },
+  { key: 'seniorities', label: '선후순위', options: ['선순위', '후순위'] },
 ]
 
 const selectedBonds = computed(() =>
@@ -48,6 +52,8 @@ watch(() => props.marketSearch, (newVal) => {
         yields: newVal.filters.yields || [],
         ratings: newVal.filters.ratings || [],
         interestCycles: newVal.filters.interestCycles || [],
+        optionTypes: newVal.filters.optionTypes || [],
+        seniorities: newVal.filters.seniorities || [],
       }
     }
   }
@@ -85,13 +91,18 @@ const filteredBonds = computed(() => {
     const matchesKeyword =
       !keyword ||
       bond.name.toLowerCase().includes(keyword) ||
+      bond.shortName.toLowerCase().includes(keyword) ||
       bond.code.toLowerCase().includes(keyword) ||
+      bond.shortCode.toLowerCase().includes(keyword) ||
+      bond.issuer.toLowerCase().includes(keyword) ||
       bond.type.toLowerCase().includes(keyword) ||
       bond.option.toLowerCase().includes(keyword)
 
     const matchesType = !hasSelected(filters.bondTypes) || filters.bondTypes.includes(bond.type)
     const matchesRating = !hasSelected(filters.ratings) || filters.ratings.includes(bond.ratingGroup)
     const matchesCycle = !hasSelected(filters.interestCycles) || filters.interestCycles.includes(bond.interestCycle)
+    const matchesOption = !hasSelected(filters.optionTypes) || filters.optionTypes.includes(bond.option)
+    const matchesSeniority = !hasSelected(filters.seniorities) || filters.seniorities.includes(bond.seniority)
 
     return (
       matchesKeyword &&
@@ -99,7 +110,9 @@ const filteredBonds = computed(() => {
       matchesMaturity(bond, filters.maturities) &&
       matchesYield(bond, filters.yields) &&
       matchesRating &&
-      matchesCycle
+      matchesCycle &&
+      matchesOption &&
+      matchesSeniority
     )
   })
 })
@@ -112,6 +125,8 @@ function resetFilters() {
     yields: [],
     ratings: [],
     interestCycles: [],
+    optionTypes: [],
+    seniorities: [],
   }
 }
 
@@ -151,7 +166,7 @@ function compareSelectedBonds() {
     <section class="search-panel market-search">
       <div class="search-box">
         <span aria-hidden="true">⌕</span>
-        <input v-model="searchKeyword" type="search" placeholder="종목명, 코드, 종류로 검색하세요" />
+        <input v-model="searchKeyword" type="search" placeholder="종목명, 단축코드, 발행기관으로 검색하세요" />
         <button type="button" @click="filtersOpen = !filtersOpen">
           {{ filtersOpen ? '필터 접기' : '상세 필터' }}
         </button>
@@ -193,12 +208,15 @@ function compareSelectedBonds() {
         <thead>
           <tr>
             <th>선택</th>
-            <th>종목명(종목코드)</th>
-            <th>구분</th>
+            <th>종목명</th>
+            <th>발행기관</th>
+            <th>분류</th>
             <th>현재가</th>
             <th>등락률</th>
             <th>매수/매도 수익률</th>
-            <th>옵션</th>
+            <th>옵션/행사일</th>
+            <th>만기/이자</th>
+            <th>상세</th>
           </tr>
         </thead>
         <tbody>
@@ -214,21 +232,33 @@ function compareSelectedBonds() {
             <td>
               <div class="bond-name-cell">
                 <strong>{{ bond.name }}</strong>
-                <span class="code">{{ bond.code }}</span>
+                <span class="code">{{ bond.code }} · {{ bond.shortCode }}</span>
               </div>
             </td>
             <td>
-              <span class="market-badge" :class="bond.marketType === '장내' ? 'internal' : 'external'">
-                {{ bond.marketType }}
-              </span>
+              <strong>{{ bond.issuer }}</strong>
+              <span>{{ bond.industry }}</span>
+            </td>
+            <td>
+              <span class="market-badge" :class="bond.marketType === '장내' ? 'internal' : 'external'">{{ bond.marketType }}</span>
+              <span class="nowrap">{{ bond.type }} · {{ bond.seniority }}</span>
+              <span class="nowrap">{{ bond.rating }}</span>
             </td>
             <td class="price">{{ bond.price }}</td>
             <td :class="bond.change.startsWith('+') ? 'up' : 'down'">{{ bond.change }}</td>
             <td class="yields">{{ bond.buyYield }} / {{ bond.sellYield }}</td>
+            <td>
+              <strong>{{ bond.option }}</strong>
+              <span class="nowrap">{{ bond.optionExercise?.startDate1 || '-' }}</span>
+            </td>
+            <td>
+              <strong>{{ bond.maturity }}</strong>
+              <span class="nowrap">{{ bond.interestCycle }} · {{ bond.interestType }}</span>
+            </td>
             <td><button class="small-action" type="button" @click="$emit('navigate', 'detail')">상세정보</button></td>
           </tr>
           <tr v-if="filteredBonds.length === 0">
-            <td colspan="7" class="empty-cell">
+            <td colspan="10" class="empty-cell">
               <div class="empty-msg">
                 <p>조건에 맞는 채권이 없습니다.</p>
                 <button type="button" @click="resetFilters">필터 초기화하기</button>
@@ -248,6 +278,20 @@ function compareSelectedBonds() {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: white;
+}
+
+.market-page :is(th, td, strong, span, button) {
+  word-break: keep-all;
+}
+
+.market-page table {
+  table-layout: auto;
+  min-width: 1040px;
+}
+
+.market-page th,
+.market-page td {
+  vertical-align: middle;
 }
 
 .market-toolbar {
@@ -281,18 +325,22 @@ tr.selected {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
 
 .bond-name-cell .code {
   color: var(--muted);
   font-size: 12px;
+  white-space: normal;
 }
 
 .market-badge {
+  display: inline-block;
   border-radius: 4px;
   padding: 2px 6px;
   font-size: 11px;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .market-badge.internal {
@@ -339,9 +387,65 @@ tr.selected {
 
 .price {
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .yields {
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.small-action {
+  min-width: 58px;
+  white-space: nowrap;
+}
+
+.market-page th:first-child,
+.market-page td:first-child {
+  width: 52px;
+}
+
+.market-page th:nth-child(2),
+.market-page td:nth-child(2) {
+  width: 19%;
+}
+
+.market-page th:nth-child(3),
+.market-page td:nth-child(3) {
+  width: 14%;
+}
+
+.market-page th:nth-child(4),
+.market-page td:nth-child(4) {
+  width: 11%;
+}
+
+.market-page th:nth-child(5),
+.market-page td:nth-child(5),
+.market-page th:nth-child(6),
+.market-page td:nth-child(6) {
+  width: 9%;
+}
+
+.market-page th:nth-child(7),
+.market-page td:nth-child(7),
+.market-page th:nth-child(8),
+.market-page td:nth-child(8) {
+  width: 12%;
+}
+
+.market-page th:nth-child(9),
+.market-page td:nth-child(9) {
+  width: 12%;
+}
+
+.market-page th:nth-child(10),
+.market-page td:nth-child(10) {
+  width: 6%;
+}
+
 </style>
