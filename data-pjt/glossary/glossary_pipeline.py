@@ -1,34 +1,59 @@
-import pdfplumber
+import os
 import re
 import csv
-import os
 import random
+import argparse
+import psycopg2
+from dotenv import load_dotenv
+
+# Load environment variables if running locally
+load_dotenv()
+
+# Database connection settings from environment variables
+DB_HOST = os.getenv("DB_HOST", "db")
+DB_PORT = os.getenv("DB_PORT", "5432")
+POSTGRES_DB = os.getenv("POSTGRES_DB", "bonds_db")
+POSTGRES_USER = os.getenv("POSTGRES_USER", "ssafyuser")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "ssafy")
+
+# Category mapping to exact IDs based on ERD/spec
+CATEGORIES = {
+    "거시 경제": 1,
+    "금리": 2,
+    "리스크 관리": 3,
+    "금융 제도": 4,
+    "시장 지표": 5,
+    "채권/발행": 6,
+    "투자 지표": 7
+}
+
+# ==========================================
+# Phase 1: PDF Extraction Helpers & Logic
+# ==========================================
 
 def deep_clean_description(text, term_name):
     if not text: return ""
     
-    # 1. 헤더/푸터 및 불필요한 고정 문구 제거
+    # Remove headers/footers
     text = re.sub(r'I\s+경제금융용어\s+800선', '', text)
     text = re.sub(r'찾아보기\s+I', '', text)
     
-    # 2. 페이지 번호 및 단독 숫자 제거
+    # Remove page numbers and solo digits
     text = re.sub(r'\n\s*\d+\s*\n', '\n', text)
     text = re.sub(r'\s{2,}\d+\s{2,}', ' ', text)
     
-    # 3. 단독 자음(ㄱ, ㄴ 등) 및 불필요한 기호 세척
+    # Remove Korean consonants/solo symbols
     text = re.sub(r'\n\s*[ㄱ-ㅎㅏ-ㅣ]\s*\n', '\n', text)
     text = re.sub(r'\s+[ㄱ-ㅎ]\s+', ' ', text)
     
-    # 4. 연관검색어 이하 제거
+    # Remove references list
     text = re.split(r'연관검색어', text)[0]
     
-    # 5. 줄바꿈 정리 및 단어 결합 (줄바꿈 시 잘린 단어 복원)
-    # 한글로 끝나고 다음 줄이 한글로 시작하면 일단 공백 없이 붙여본 후 조사 패턴 처리
+    # Merge lines
     lines = [line.strip() for line in text.split('\n') if line.strip()]
     full_text = ""
     for i in range(len(lines)):
         if i > 0 and re.search(r'[가-힣]$', lines[i-1]) and re.match(r'^[가-힣]', lines[i]):
-            # 문장이 마침표로 끝나지 않았다면 줄바꿈 시 잘린 단어일 확률이 높음
             if not re.search(r'[.!?]$', lines[i-1]):
                 full_text += lines[i]
             else:
@@ -36,21 +61,19 @@ def deep_clean_description(text, term_name):
         else:
             full_text += (" " if full_text else "") + lines[i]
     
-    # 6. 비정상적인 띄어쓰기 교정 (예: "경 기" -> "경기", "증가하 여" -> "증가하여")
-    # 조사 및 접미사 결합 로직
+    # Fix spacing issues with particles
     particles = "은|는|이|가|을|를|에|의|로|와|과|도|만|뿐|까지|부터|하여|하며|하고|한다|한다면"
     full_text = re.sub(rf'\s+({particles})(?=\s|$|[.!?])', r'\1', full_text)
     
-    # 한 글자씩 떨어진 단어 결합 (예: "경 기 변 동" -> "경기변동")
-    # 한글+공백+한글 패턴을 3회 반복하여 결합
+    # Merge single letter words
     for _ in range(3):
         full_text = re.sub(r'([가-힣])\s([가-힣])(?=\s|[.!?]|$)', r'\1\2', full_text)
-
-    # 7. 용어 이름 반복 제거 및 다중 공백 정리
+    
+    # Clean term repeats and spacing
     full_text = re.sub(rf'^{re.escape(term_name)}\s+', '', full_text)
     full_text = re.sub(r'\s+', ' ', full_text).strip()
     
-    # 8. 최종 문장 절삭 (마침표 이후 노이즈 제거)
+    # Final sentence truncation
     if "." in full_text:
         last_period_idx = full_text.rfind(".")
         full_text = full_text[:last_period_idx + 1]
@@ -132,11 +155,17 @@ def get_expert_metadata(term, description):
     example = generate_truly_unique_example(term, category)
     return category, difficulty, example
 
-def master_extract(pdf_path, csv_path):
-    print(f"채권 마스터의 명예를 건 800선 최종 정제 작업 시작...")
+def run_extraction(pdf_path, csv_path):
+    import pdfplumber
+    print(f"Extracting glossary from PDF: {pdf_path}...")
+    if not os.path.exists(pdf_path):
+        print(f"Error: PDF file not found at {pdf_path}")
+        return False
+        
     with pdfplumber.open(pdf_path) as pdf:
         unique_terms = []
         seen = set()
+        # Pages with glossary index
         for i in range(3, 18):
             page = pdf.pages[i]
             text = page.extract_text() or ""
@@ -207,7 +236,170 @@ def master_extract(pdf_path, csv_path):
                 row['term_id'] = i + 1
                 writer.writerow(row)
         
-    print(f"작업 완료! 800개의 초정밀 데이터셋이 glossary.csv에 저장되었습니다.")
+    print(f"Extraction complete! 800 terms saved to {csv_path}")
+    return True
+
+# ==========================================
+# Phase 2: CSV Cleanup Logic
+# ==========================================
+
+def run_cleanup(csv_path):
+    print(f"Cleaning up CSV glossary: {csv_path}...")
+    if not os.path.exists(csv_path):
+        print(f"Error: CSV file not found at {csv_path}")
+        return False
+
+    rows = []
+    with open(csv_path, 'r', encoding='utf-8-sig') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            rows.append(row)
+    
+    # 1. Filter and clean
+    cleaned_data = {}
+    for row in rows:
+        name = row['term_name']
+        desc = row['description'] or ""
+        
+        if len(desc) < 20: continue
+        
+        # Deep clean description
+        desc = re.sub(r'\s\d+\s', ' ', desc)
+        desc = re.sub(r'\s+', ' ', desc).strip()
+        
+        # Keep longest description for each term
+        if name not in cleaned_data or len(desc) > len(cleaned_data[name]['description']):
+            row['description'] = desc
+            cleaned_data[name] = row
+            
+    # 2. Re-assign IDs and sort
+    sorted_terms = sorted(cleaned_data.values(), key=lambda x: int(x['term_id']))
+    for i, row in enumerate(sorted_terms):
+        row['term_id'] = i + 1
+        
+    # 3. Write back
+    keys = ['term_id', 'term_name', 'category', 'difficulty', 'description', 'example_text']
+    with open(csv_path, 'w', encoding='utf-8-sig', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=keys)
+        writer.writeheader()
+        writer.writerows(sorted_terms)
+    
+    print(f"Cleanup complete! Final terms count: {len(sorted_terms)}")
+    return True
+
+# ==========================================
+# Phase 3: DB Loading Logic
+# ==========================================
+
+def run_db_load(csv_path):
+    print(f"Loading Glossary from CSV: {csv_path} into PostgreSQL...")
+    if not os.path.exists(csv_path):
+        print(f"Error: CSV file not found at {csv_path}")
+        return False
+
+    try:
+        conn = psycopg2.connect(
+            host=DB_HOST,
+            port=DB_PORT,
+            database=POSTGRES_DB,
+            user=POSTGRES_USER,
+            password=POSTGRES_PASSWORD
+        )
+        cur = conn.cursor()
+    except Exception as e:
+        print(f"Database connection failed: {e}")
+        return False
+
+    try:
+        # 1. Sync Categories
+        print("Syncing Glossary categories...")
+        for cat_name, cat_id in CATEGORIES.items():
+            cur.execute("""
+                INSERT INTO "GlossaryCategory" (category_id, category_name, created_at, updated_at)
+                VALUES (%s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT (category_id) DO UPDATE SET category_name = EXCLUDED.category_name;
+            """, (cat_id, cat_name))
+        
+        # 2. Load Glossary terms
+        terms_inserted = 0
+        with open(csv_path, mode="r", encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                term_id = int(row["term_id"])
+                term_name = row["term_name"]
+                category_name = row["category"]
+                difficulty = row["difficulty"]
+                description = row["description"]
+                example_text = row["example_text"]
+
+                category_id = CATEGORIES.get(category_name, 1)
+
+                if difficulty not in ["입문", "기초", "중요", "심화"]:
+                    difficulty = "기초"
+
+                cur.execute("""
+                    INSERT INTO "Glossary" (term_id, category_id, term_name, difficulty, description, example_text, created_at, updated_at)
+                    VALUES (%s, %s, %s, %s::difficulty_enum, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    ON CONFLICT (term_id) DO UPDATE SET
+                        category_id = EXCLUDED.category_id,
+                        term_name = EXCLUDED.term_name,
+                        difficulty = EXCLUDED.difficulty,
+                        description = EXCLUDED.description,
+                        example_text = EXCLUDED.example_text,
+                        updated_at = CURRENT_TIMESTAMP;
+                """, (term_id, category_id, term_name, difficulty, description, example_text))
+                terms_inserted += 1
+
+        conn.commit()
+        print(f"Database load complete! Total terms synced: {terms_inserted}")
+        return True
+
+    except Exception as e:
+        conn.rollback()
+        print(f"Error loading to DB: {e}")
+        return False
+    finally:
+        cur.close()
+        conn.close()
+
+# ==========================================
+# Main CLI Orchestration
+# ==========================================
+
+def main():
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    default_pdf = os.path.abspath(os.path.join(script_dir, "..", "..", "2026_한국은행_경제금융용어 800선.pdf"))
+    default_csv = os.path.join(script_dir, "glossary.csv")
+
+    parser = argparse.ArgumentParser(description="Glossary pipeline manager (Extraction -> Cleanup -> DB Load)")
+    parser.add_argument("--extract", action="store_true", help="Extract glossary from PDF to CSV")
+    parser.add_argument("--cleanup", action="store_true", help="Filter and clean the CSV dataset")
+    parser.add_argument("--load", action="store_true", help="Load the CSV dataset into PostgreSQL")
+    parser.add_argument("--all", action="store_true", help="Execute all pipeline phases sequentially")
+    parser.add_argument("--pdf", default=default_pdf, help="Path to source PDF file")
+    parser.add_argument("--csv", default=default_csv, help="Path to target CSV file")
+
+    args = parser.parse_args()
+
+    # If no flags are provided, show help
+    if not (args.extract or args.cleanup or args.load or args.all):
+        parser.print_help()
+        return
+
+    if args.all or args.extract:
+        if not run_extraction(args.pdf, args.csv):
+            print("Failed at extraction stage.")
+            return
+
+    if args.all or args.cleanup:
+        if not run_cleanup(args.csv):
+            print("Failed at cleanup stage.")
+            return
+
+    if args.all or args.load:
+        if not run_db_load(args.csv):
+            print("Failed at DB loading stage.")
+            return
 
 if __name__ == "__main__":
-    master_extract("../2026_한국은행_경제금융용어 800선.pdf", "glossary.csv")
+    main()
