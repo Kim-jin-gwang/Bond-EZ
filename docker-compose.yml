@@ -3,6 +3,7 @@ services:
   db:
     container_name: postgres
     image: pgvector/pgvector:pg16
+    restart: always
     stdin_open: true
     tty: true
     volumes:
@@ -25,6 +26,7 @@ services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.4.0
     container_name: zookeeper
+    restart: always
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
@@ -34,6 +36,7 @@ services:
   kafka:
     image: confluentinc/cp-kafka:7.4.0
     container_name: kafka
+    restart: always
     depends_on:
       - zookeeper
     ports:
@@ -41,6 +44,7 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
@@ -87,6 +91,7 @@ services:
       context: .
       dockerfile: data-pjt/airflow/Dockerfile.airflow
     container_name: airflow-webserver
+    restart: always
     depends_on:
       db:
         condition: service_healthy
@@ -115,6 +120,7 @@ services:
       context: .
       dockerfile: data-pjt/airflow/Dockerfile.airflow
     container_name: airflow-scheduler
+    restart: always
     depends_on:
       db:
         condition: service_healthy
@@ -167,6 +173,7 @@ services:
       context: .
       dockerfile: data-pjt/flink/Dockerfile.flink
     container_name: flink-jobmanager
+    restart: always
     ports:
       - "8082:8081"
     command: jobmanager
@@ -182,6 +189,7 @@ services:
       context: .
       dockerfile: data-pjt/flink/Dockerfile.flink
     container_name: flink-taskmanager
+    restart: always
     depends_on:
       - flink-jobmanager
     command: taskmanager
@@ -199,6 +207,7 @@ services:
       context: ./data-pjt
       dockerfile: Dockerfile.dev
     container_name: news-crawler
+    restart: always
     depends_on:
       - kafka
     environment:
@@ -214,6 +223,7 @@ services:
       context: .
       dockerfile: data-pjt/flink/Dockerfile.flink
     container_name: flink-job-submitter
+    restart: on-failure
     depends_on:
       - flink-jobmanager
       - db

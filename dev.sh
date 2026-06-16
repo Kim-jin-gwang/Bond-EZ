@@ -112,9 +112,12 @@ wait_for_healthy "$DB_SERVICE"
 info "Starting all remaining pipeline and application services..."
 $COMPOSE up -d
 
-# 5. Django 마이그레이션 실행
+# 5. Django 마이그레이션 및 기초 데이터 적재 실행
 info "Applying Django migrations..."
 $COMPOSE exec "$BACKEND_SERVICE" python manage.py migrate
+
+info "Loading Glossary data from CSV into PostgreSQL..."
+$COMPOSE exec news-crawler python glossary/glossary_pipeline.py --load
 
 # 접속 정보 출력
 FRONTEND_PORT="$(env_value_or_default FRONTEND_PORT 5173)"
