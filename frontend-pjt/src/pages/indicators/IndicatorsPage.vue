@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { indicators } from '../../data/indicators'
 
 const props = defineProps({
@@ -14,6 +14,41 @@ const emit = defineEmits(['navigate'])
 const activeIndicator = computed(() => {
   return indicators.find((indicator) => indicator.id === props.selectedIndicatorId) ?? indicators[0]
 })
+
+const creditRateView = ref('rates')
+const creditBaseDate = ref('2024-10-16')
+
+const gradedRateColumns = ['등급', '2021.12.31', '2022.12.30', '2023.12.29', '2024.10.02', '2024.10.08', '2024.10.16']
+const gradedRateRows = [
+  ['AAA', '2.30', '4.99', '3.68', '3.24', '3.37', '3.30'],
+  ['AA+', '2.35', '5.11', '3.78', '3.30', '3.44', '3.38'],
+  ['AA', '2.38', '5.14', '3.82', '3.33', '3.46', '3.40'],
+  ['AA-', '2.41', '5.22', '3.89', '3.37', '3.50', '3.44'],
+  ['A+', '2.57', '5.48', '4.54', '3.71', '3.86', '3.80'],
+  ['A', '2.84', '5.74', '4.80', '3.97', '4.12', '4.06'],
+  ['A-', '3.29', '6.18', '5.25', '4.40', '4.55', '4.49'],
+  ['BBB+', '5.86', '8.73', '7.91', '6.82', '6.97', '6.91'],
+  ['BBB', '6.91', '9.78', '8.95', '7.87', '8.02', '7.96'],
+  ['BBB-', '8.28', '11.15', '10.32', '9.25', '9.40', '9.34'],
+]
+
+const spreadColumns = ['등급', '3월', '6월', '9월', '1년', '1년 6개월', '2년', '3년', '5년']
+const spreadRows = [
+  ['국고채', '3.07', '2.95', '2.94', '2.86', '2.92', '2.90', '2.88', '2.92'],
+  ['AAA', '0.38', '0.45', '0.39', '0.38', '0.33', '0.37', '0.42', '0.42'],
+  ['AA+', '0.40', '0.47', '0.41', '0.39', '0.35', '0.41', '0.50', '0.49'],
+  ['AA', '0.41', '0.48', '0.43', '0.42', '0.39', '0.43', '0.52', '0.55'],
+  ['AA-', '0.43', '0.51', '0.45', '0.44', '0.41', '0.47', '0.56', '0.65'],
+  ['A+', '0.45', '0.58', '0.62', '0.68', '0.67', '0.72', '0.92', '1.38'],
+  ['A', '0.55', '0.71', '0.79', '0.85', '0.83', '0.90', '1.18', '1.79'],
+  ['A-', '0.78', '0.97', '1.05', '1.11', '1.13', '1.22', '1.61', '2.40'],
+  ['BBB+', '1.23', '1.67', '2.06', '2.35', '2.76', '3.33', '4.03', '4.37'],
+  ['BBB', '1.63', '2.20', '2.67', '3.05', '3.57', '4.28', '5.08', '5.41'],
+  ['BBB-', '2.30', '3.01', '3.62', '4.04', '4.69', '5.45', '6.46', '6.85'],
+]
+
+const creditTableColumns = computed(() => creditRateView.value === 'rates' ? gradedRateColumns : spreadColumns)
+const creditTableRows = computed(() => creditRateView.value === 'rates' ? gradedRateRows : spreadRows)
 
 const barRows = computed(() => {
   const rows = activeIndicator.value.tableRows || []
@@ -47,7 +82,68 @@ const barRows = computed(() => {
       </button>
     </div>
 
-    <article class="indicator-detail-card">
+    <article v-if="activeIndicator.id === 'credit-rating-yield'" class="credit-rate-board">
+      <header class="credit-board-header">
+        <div>
+          <p class="eyebrow">Credit Rating Rates</p>
+          <h2>금리 및 스프레드</h2>
+          <p>신용등급별 회사채 금리와 국고채 대비 스프레드를 기준일별로 확인합니다.</p>
+        </div>
+      </header>
+
+      <section class="credit-search-box" aria-label="기준일 검색">
+        <label>
+          <span>기준일자</span>
+          <input v-model="creditBaseDate" type="date" />
+        </label>
+        <button type="button" aria-label="기준일 조회">조회</button>
+      </section>
+
+      <div class="credit-sub-tabs" aria-label="신용등급 금리 보기 방식">
+        <button
+          :class="{ active: creditRateView === 'rates' }"
+          type="button"
+          @click="creditRateView = 'rates'"
+        >
+          등급별 금리
+        </button>
+        <button
+          :class="{ active: creditRateView === 'spreads' }"
+          type="button"
+          @click="creditRateView = 'spreads'"
+        >
+          등급별 스프레드
+        </button>
+      </div>
+
+      <div class="credit-table-wrap">
+        <table class="credit-rate-table">
+          <thead>
+            <tr>
+              <th v-for="column in creditTableColumns" :key="column">{{ column }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in creditTableRows" :key="row.join('-')">
+              <th scope="row">{{ row[0] }}</th>
+              <td v-for="cell in row.slice(1)" :key="cell">{{ cell }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <section class="credit-board-note">
+        <h3>{{ creditRateView === 'rates' ? '등급별 금리 해석' : '등급별 스프레드 해석' }}</h3>
+        <p v-if="creditRateView === 'rates'">
+          등급이 낮아질수록 투자자가 요구하는 위험 보상이 커져 금리가 높아집니다. 같은 기준일 안에서도 AAA와 BBB 구간의 차이를 보면 신용위험 프리미엄을 빠르게 파악할 수 있습니다.
+        </p>
+        <p v-else>
+          스프레드는 국고채 대비 추가 수익률입니다. 스프레드가 확대되면 시장이 신용위험을 더 크게 반영하고 있다는 뜻이므로, 수익률뿐 아니라 발행사 재무와 유동성도 함께 확인해야 합니다.
+        </p>
+      </section>
+    </article>
+
+    <article v-else class="indicator-detail-card">
       <header class="indicator-detail-header">
         <div>
           <p class="eyebrow">Indicator Report</p>
@@ -165,6 +261,139 @@ const barRows = computed(() => {
   border-color: var(--primary);
   color: white;
   background: var(--primary);
+}
+
+.credit-rate-board {
+  display: grid;
+  gap: 20px;
+}
+
+.credit-board-header h2 {
+  margin-bottom: 8px;
+  font-size: clamp(28px, 4vw, 40px);
+}
+
+.credit-board-header p:not(.eyebrow) {
+  margin-bottom: 0;
+}
+
+.credit-search-box,
+.credit-sub-tabs,
+.credit-table-wrap,
+.credit-board-note {
+  border: 1px solid var(--line);
+  background: white;
+}
+
+.credit-search-box {
+  display: flex;
+  gap: 18px;
+  align-items: end;
+  padding: 20px;
+  box-shadow: inset 0 -5px 0 #e2e5e9;
+}
+
+.credit-search-box label {
+  display: flex;
+  grid-template-columns: none;
+  gap: 12px;
+  align-items: center;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.credit-search-box input {
+  width: 150px;
+  border-radius: 0;
+  font-weight: 800;
+}
+
+.credit-search-box button {
+  min-width: 94px;
+  min-height: 42px;
+  border: 0;
+  color: white;
+  background: #0097dc;
+  font-size: 0;
+}
+
+.credit-search-box button::before {
+  content: "⌕";
+  font-size: 28px;
+  font-weight: 900;
+}
+
+.credit-sub-tabs {
+  display: flex;
+  margin-top: 2px;
+}
+
+.credit-sub-tabs button {
+  min-width: 140px;
+  min-height: 58px;
+  border: 0;
+  border-right: 1px solid var(--line);
+  color: var(--text);
+  background: #f6f6f6;
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.credit-sub-tabs button.active {
+  color: white;
+  background: #0067c5;
+}
+
+.credit-table-wrap {
+  overflow: auto;
+  border-top: 3px solid #0067c5;
+}
+
+.credit-rate-table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+  background: white;
+}
+
+.credit-rate-table th,
+.credit-rate-table td {
+  height: 58px;
+  padding: 14px 16px;
+  border: 1px solid #d7dce2;
+  text-align: center;
+}
+
+.credit-rate-table thead th {
+  background: #f8f8f8;
+  color: #111827;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.credit-rate-table tbody th {
+  color: #005bbb;
+  background: white;
+  font-weight: 900;
+}
+
+.credit-rate-table td {
+  font-variant-numeric: tabular-nums;
+}
+
+.credit-board-note {
+  padding: 20px;
+}
+
+.credit-board-note h3 {
+  margin-bottom: 8px;
+  font-size: 18px;
+}
+
+.credit-board-note p {
+  margin-bottom: 0;
+  line-height: 1.7;
 }
 
 .indicator-detail-card {
