@@ -346,13 +346,14 @@ const barRows = computed(() => {
 }
 
 .credit-table-wrap {
-  overflow: auto;
+  overflow-x: auto;
   border-top: 3px solid #0067c5;
 }
 
 .credit-rate-table {
   width: 100%;
-  min-width: 980px;
+  min-width: 0;
+  table-layout: fixed;
   border-collapse: collapse;
   background: white;
 }
@@ -360,9 +361,10 @@ const barRows = computed(() => {
 .credit-rate-table th,
 .credit-rate-table td {
   height: 58px;
-  padding: 14px 16px;
+  padding: 13px 10px;
   border: 1px solid #d7dce2;
   text-align: center;
+  word-break: keep-all;
 }
 
 .credit-rate-table thead th {
@@ -470,7 +472,7 @@ const barRows = computed(() => {
 
 .indicator-data-layout {
   display: grid;
-  grid-template-columns: minmax(360px, 0.95fr) minmax(420px, 1.05fr);
+  grid-template-columns: minmax(520px, 0.95fr) minmax(520px, 1.05fr);
   gap: 16px;
 }
 
@@ -489,12 +491,13 @@ const barRows = computed(() => {
 }
 
 .indicator-table-wrap {
-  overflow-x: auto;
+  overflow-x: visible;
 }
 
 .indicator-data-table {
   width: 100%;
-  min-width: 620px;
+  min-width: 0;
+  table-layout: fixed;
   border-collapse: collapse;
 }
 
@@ -503,6 +506,7 @@ const barRows = computed(() => {
   padding: 13px 14px;
   border: 1px solid var(--line);
   text-align: left;
+  word-break: keep-all;
 }
 
 .indicator-data-table th {
