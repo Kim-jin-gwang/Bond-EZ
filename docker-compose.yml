@@ -102,13 +102,19 @@ services:
       - AIRFLOW__CORE__DEFAULT_TIMEZONE=Asia/Seoul
       - AIRFLOW__WEBSERVER__DEFAULT_UI_TIMEZONE=Asia/Seoul
       - TZ=Asia/Seoul
-      - _PIP_ADDITIONAL_REQUIREMENTS=${AIRFLOW_PIP_DEPS:-kafka-python python-dotenv requests pyspark psycopg2-binary}
+      - POSTGRES_DB=${POSTGRES_DB:-bonds_db}
+      - POSTGRES_USER=${POSTGRES_USER:-ssafyuser}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-ssafy}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - _PIP_ADDITIONAL_REQUIREMENTS=${AIRFLOW_PIP_DEPS:-kafka-python python-dotenv requests pyspark psycopg2-binary pandas}
     env_file:
       - .env
     volumes:
       - ./data-pjt/airflow/dags:/opt/airflow/dags
       - ./data-pjt/airflow/logs:/opt/airflow/logs
       - ./data-pjt/airflow/plugins:/opt/airflow/plugins
+      - ./data-pjt:/app
     ports:
       - "8081:8080"
     command: webserver
@@ -131,13 +137,19 @@ services:
       - AIRFLOW__CORE__DEFAULT_TIMEZONE=Asia/Seoul
       - AIRFLOW__WEBSERVER__DEFAULT_UI_TIMEZONE=Asia/Seoul
       - TZ=Asia/Seoul
-      - _PIP_ADDITIONAL_REQUIREMENTS=${AIRFLOW_PIP_DEPS:-kafka-python python-dotenv requests pyspark psycopg2-binary}
+      - POSTGRES_DB=${POSTGRES_DB:-bonds_db}
+      - POSTGRES_USER=${POSTGRES_USER:-ssafyuser}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-ssafy}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - _PIP_ADDITIONAL_REQUIREMENTS=${AIRFLOW_PIP_DEPS:-kafka-python python-dotenv requests pyspark psycopg2-binary pandas}
     env_file:
       - .env
     volumes:
       - ./data-pjt/airflow/dags:/opt/airflow/dags
       - ./data-pjt/airflow/logs:/opt/airflow/logs
       - ./data-pjt/airflow/plugins:/opt/airflow/plugins
+      - ./data-pjt:/app
     command: scheduler
     networks:
       - de_net
@@ -160,7 +172,12 @@ services:
       - _AIRFLOW_WWW_USER_CREATE=true
       - _AIRFLOW_WWW_USER_USERNAME=${AIRFLOW_USERNAME:-admin}
       - _AIRFLOW_WWW_USER_PASSWORD=${AIRFLOW_PASSWORD:-admin}
-      - _PIP_ADDITIONAL_REQUIREMENTS=${AIRFLOW_PIP_DEPS:-kafka-python python-dotenv requests pyspark psycopg2-binary}
+      - POSTGRES_DB=${POSTGRES_DB:-bonds_db}
+      - POSTGRES_USER=${POSTGRES_USER:-ssafyuser}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-ssafy}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - _PIP_ADDITIONAL_REQUIREMENTS=${AIRFLOW_PIP_DEPS:-kafka-python python-dotenv requests pyspark psycopg2-binary pandas}
     env_file:
       - .env
     command: version
