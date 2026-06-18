@@ -5,8 +5,8 @@ from apps.common.responses import error, ok, paginated_response
 from .models import BondType, CreditRating, GuaranteeStatus, Industry, Seniority
 from .selectors import filtered_bonds, get_bond, get_bonds_for_compare, get_latest_market_data, market_data_history
 from .serializers import (
-    serialize_bond_detail,
     serialize_bond_compare_item,
+    serialize_bond_detail,
     serialize_bond_list_item,
     serialize_cashflow_rule,
     serialize_market_data,
@@ -46,17 +46,11 @@ def bond_compare(request):
         )
 
     bond_ids = list(dict.fromkeys(bond_ids))
-    if len(bond_ids) < 2:
+    if len(bond_ids) != 2:
         return error(
-            "COMPARE_BONDS_TOO_FEW",
-            "비교할 채권은 2개 이상이어야 합니다.",
-            details={"field": "ids"},
-        )
-    if len(bond_ids) > 5:
-        return error(
-            "COMPARE_BONDS_TOO_MANY",
-            "비교할 채권은 최대 5개까지 가능합니다.",
-            details={"field": "ids", "max": 5},
+            "COMPARE_BONDS_COUNT_INVALID",
+            "비교할 채권은 정확히 2개여야 합니다.",
+            details={"field": "ids", "required_count": 2},
         )
 
     bonds = get_bonds_for_compare(bond_ids)
