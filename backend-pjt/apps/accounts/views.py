@@ -46,6 +46,10 @@ def login(request):
 @csrf_exempt
 @require_http_methods(["POST"])
 def logout(request):
+    auth_error = require_authenticated_user(request)
+    if auth_error:
+        return auth_error
+
     logout_user(request)
     return ok({}, status=204)
 
@@ -70,4 +74,3 @@ def me(request):
         return error(error_code, message, details=details)
 
     return ok({"user": serialize_user(request.user)})
-

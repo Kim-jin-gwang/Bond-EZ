@@ -2,7 +2,7 @@ import json
 from math import ceil
 
 from django.core.paginator import EmptyPage, Paginator
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 
 
 def parse_json_body(request):
@@ -16,6 +16,8 @@ def parse_json_body(request):
 
 
 def ok(data, status=200):
+    if status == 204:
+        return HttpResponse(status=204)
     return JsonResponse(data, status=status, json_dumps_params={"ensure_ascii": False})
 
 
