@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'apps.bonds',
     'apps.glossary',
     'apps.indicators',
+    'apps.mainpage',
     'apps.news',
     'apps.portfolios',
 ]
