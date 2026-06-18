@@ -1,0 +1,23 @@
+def serialize_provider(provider):
+    return {
+        "provider_id": provider.id,
+        "provider_name": provider.provider_name,
+    }
+
+
+def serialize_news_list_item(news):
+    return {
+        "news_id": news.id,
+        "source": serialize_provider(news.source),
+        "title": news.title,
+        "url": news.url,
+        "summary": news.summary,
+        "published_at": news.published_at.isoformat() if news.published_at else None,
+    }
+
+
+def serialize_news_detail(news):
+    data = serialize_news_list_item(news)
+    data["content"] = news.content
+    return data
+
