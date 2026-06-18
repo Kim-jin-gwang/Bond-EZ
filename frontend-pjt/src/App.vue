@@ -25,18 +25,26 @@ watch(selectedIndicatorId, (indicatorId) => {
     <GlobalNav :active-page="currentPage" @navigate="navigate" />
     <main>
       <RouterView v-slot="{ Component }">
-        <component
-          :is="Component"
-          :selected-indicator-id="selectedIndicatorId"
-          :market-search="appStore.marketSearch"
-          :compare-bonds="appStore.compareBonds"
-          :is-logged-in="appStore.isLoggedIn"
-          :user="appStore.user"
-          :current-sub-page="currentSubPage"
-          @navigate="navigate"
-          @login="appStore.login"
-          @logout="appStore.logout"
-        />
+        <Suspense>
+          <component
+            :is="Component"
+            :selected-indicator-id="selectedIndicatorId"
+            :market-search="appStore.marketSearch"
+            :compare-bonds="appStore.compareBonds"
+            :is-logged-in="appStore.isLoggedIn"
+            :user="appStore.user"
+            :current-sub-page="currentSubPage"
+            @navigate="navigate"
+            @login="appStore.login"
+            @logout="appStore.logout"
+          />
+          <template #fallback>
+            <section class="page loading-state" aria-live="polite">
+              <p class="eyebrow">Loading</p>
+              <h1>화면을 불러오는 중입니다</h1>
+            </section>
+          </template>
+        </Suspense>
       </RouterView>
     </main>
   </div>

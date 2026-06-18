@@ -1,4 +1,4 @@
-import { computed } from 'vue'
+import { computed, unref } from 'vue'
 
 export function createEmptyBondFilters() {
   return {
@@ -14,10 +14,11 @@ export function createEmptyBondFilters() {
 
 export function useBondFilter(bonds, searchKeyword, selectedFilters) {
   const filteredBonds = computed(() => {
+    const bondList = unref(bonds) || []
     const keyword = searchKeyword.value.toLowerCase()
     const filters = selectedFilters.value
 
-    return bonds.filter((bond) => {
+    return bondList.filter((bond) => {
       const matchesKeyword =
         !keyword ||
         bond.name.toLowerCase().includes(keyword) ||

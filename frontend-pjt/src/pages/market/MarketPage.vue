@@ -1,9 +1,19 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { getBonds } from '../../api/bonds'
+import { fetchBonds, getBonds } from '../../api/bonds'
+import { useAsyncData } from '../../composables/useAsyncData'
 import { createEmptyBondFilters, useBondFilter } from '../../composables/useBondFilter'
+import { useDebouncedRef } from '../../composables/useDebouncedRef'
 
-const bonds = getBonds()
+const initialBonds = getBonds()
+const {
+  data: bonds,
+  isLoading,
+  error,
+  execute: reloadBonds,
+} = useAsyncData(fetchBonds, {
+  initialData: initialBonds,
+})
 
 const emit = defineEmits(['navigate'])
 
@@ -15,8 +25,10 @@ const props = defineProps({
 })
 
 const filtersOpen = ref(false)
-const searchKeyword = ref(props.marketSearch?.keyword || '')
+const searchInput = ref(props.marketSearch?.keyword || '')
+const searchKeyword = useDebouncedRef(searchInput)
 const selectedBondCodes = ref([])
+const visibleLimit = ref(50)
 const selectedFilters = ref({
   ...createEmptyBondFilters(),
   ...props.marketSearch?.filters,
@@ -34,7 +46,7 @@ const filterGroups = [
 
 const selectedBonds = computed(() =>
   selectedBondCodes.value
-    .map((code) => bonds.find((bond) => bond.code === code))
+    .map((code) => bonds.value.find((bond) => bond.code === code))
     .filter(Boolean),
 )
 
@@ -42,7 +54,7 @@ const canCompare = computed(() => selectedBondCodes.value.length === 2)
 
 watch(() => props.marketSearch, (newVal) => {
   if (newVal) {
-    searchKeyword.value = newVal.keyword || ''
+    searchInput.value = newVal.keyword || ''
     if (newVal.filters) {
       selectedFilters.value = {
         bondTypes: newVal.filters.bondTypes || [],
@@ -57,11 +69,21 @@ watch(() => props.marketSearch, (newVal) => {
   }
 }, { deep: true })
 
+watch([searchKeyword, selectedFilters], () => {
+  visibleLimit.value = 50
+}, { deep: true })
+
 const { filteredBonds } = useBondFilter(bonds, searchKeyword, selectedFilters)
+const visibleBonds = computed(() => filteredBonds.value.slice(0, visibleLimit.value))
+const hasMoreBonds = computed(() => visibleBonds.value.length < filteredBonds.value.length)
 
 function resetFilters() {
-  searchKeyword.value = ''
+  searchInput.value = ''
   selectedFilters.value = createEmptyBondFilters()
+}
+
+function showMoreBonds() {
+  visibleLimit.value += 50
 }
 
 function isBondSelected(code) {
@@ -100,7 +122,14 @@ function compareSelectedBonds() {
     <section class="search-panel market-search">
       <div class="search-box">
         <span aria-hidden="true">⌕</span>
-        <input v-model="searchKeyword" type="search" placeholder="종목명, 단축코드, 발행기관으로 검색하세요" />
+        <label class="sr-only" for="bond-search">채권 검색어</label>
+        <input
+          id="bond-search"
+          v-model="searchInput"
+          type="search"
+          autocomplete="off"
+          placeholder="종목명, 단축코드, 발행기관으로 검색하세요"
+        />
         <button type="button" @click="filtersOpen = !filtersOpen">
           {{ filtersOpen ? '필터 접기' : '상세 필터' }}
         </button>
@@ -123,7 +152,7 @@ function compareSelectedBonds() {
     <div class="toolbar market-toolbar">
       <div class="market-info">
         <p class="eyebrow">전체 채권 시세</p>
-        <h1>{{ filteredBonds.length }}개의 채권이 검색되었습니다</h1>
+        <h1 aria-live="polite">{{ filteredBonds.length }}개의 채권이 검색되었습니다</h1>
         <p class="selection-help">비교할 채권을 최대 2개까지 선택하세요. 현재 {{ selectedBondCodes.length }}/2개 선택</p>
       </div>
       <button
@@ -137,8 +166,20 @@ function compareSelectedBonds() {
       </button>
     </div>
 
+    <section v-if="isLoading" class="market-state" aria-live="polite">
+      <strong>채권 데이터를 불러오는 중입니다.</strong>
+      <p>캐시된 데이터가 있으면 먼저 보여주고, 최신 데이터를 다시 확인합니다.</p>
+    </section>
+
+    <section v-if="error" class="market-state error-state" role="alert">
+      <strong>채권 데이터를 불러오지 못했습니다.</strong>
+      <p>{{ error.message || '잠시 후 다시 시도해주세요.' }}</p>
+      <button type="button" @click="reloadBonds">다시 시도</button>
+    </section>
+
     <div class="table-wrap">
       <table>
+        <caption class="sr-only">채권 시세 검색 결과</caption>
         <thead>
           <tr>
             <th>선택</th>
@@ -154,10 +195,11 @@ function compareSelectedBonds() {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="bond in filteredBonds" :key="bond.code" :class="{ selected: isBondSelected(bond.code) }">
+          <tr v-for="bond in visibleBonds" :key="bond.code" :class="{ selected: isBondSelected(bond.code) }">
             <td>
               <input
                 type="checkbox"
+                :aria-label="`${bond.shortName} 비교 선택`"
                 :checked="isBondSelected(bond.code)"
                 :disabled="isSelectionDisabled(bond.code)"
                 @change="toggleBondSelection(bond.code)"
@@ -191,7 +233,7 @@ function compareSelectedBonds() {
             </td>
             <td><button class="small-action" type="button" @click="$emit('navigate', 'detail')">상세정보</button></td>
           </tr>
-          <tr v-if="filteredBonds.length === 0">
+          <tr v-if="!isLoading && filteredBonds.length === 0">
             <td colspan="10" class="empty-cell">
               <div class="empty-msg">
                 <p>조건에 맞는 채권이 없습니다.</p>
@@ -201,6 +243,12 @@ function compareSelectedBonds() {
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <div v-if="hasMoreBonds" class="more-results">
+      <button type="button" @click="showMoreBonds">
+        {{ filteredBonds.length - visibleBonds.length }}개 더 보기
+      </button>
     </div>
   </section>
 </template>
@@ -212,6 +260,51 @@ function compareSelectedBonds() {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: white;
+}
+
+.sr-only {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  margin: -1px;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.market-state {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.market-state p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.error-state {
+  border-color: #f2c7c7;
+  background: #fff7f7;
+}
+
+.error-state button,
+.more-results button {
+  width: fit-content;
+  min-height: 38px;
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  padding: 0 14px;
+  color: var(--primary);
+  background: white;
+  font-weight: 800;
 }
 
 .market-page :is(th, td, strong, span, button) {
@@ -317,6 +410,12 @@ tr.selected {
   color: var(--primary);
   background: transparent;
   font-weight: 600;
+}
+
+.more-results {
+  display: flex;
+  justify-content: center;
+  margin-top: 18px;
 }
 
 .price {
