@@ -1,6 +1,8 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { indicators } from '../../data/indicators'
+import { getIndicators } from '../../api/indicators'
+
+const indicators = getIndicators()
 
 const props = defineProps({
   selectedIndicatorId: {

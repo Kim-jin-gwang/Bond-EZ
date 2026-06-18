@@ -1,6 +1,8 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { selectedBond } from '../../data/bonds'
+import { getSelectedBond } from '../../api/bonds'
+
+const selectedBond = getSelectedBond()
 
 const investmentAmount = ref(1000000)
 const purchaseDate = ref('2026-06-14')

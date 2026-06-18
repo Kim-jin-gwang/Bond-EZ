@@ -1,6 +1,8 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { indicators } from '../../../data/indicators'
+import { getIndicators } from '../../../api/indicators'
+
+const indicators = getIndicators()
 
 const activeRange = ref('3개월')
 const ranges = ['1개월', '3개월', '1년']

@@ -1,6 +1,8 @@
 <script setup>
 import { computed } from 'vue'
-import { bonds } from '../../data/bonds'
+import { getBonds } from '../../api/bonds'
+
+const bonds = getBonds()
 
 const props = defineProps({
   compareBonds: {

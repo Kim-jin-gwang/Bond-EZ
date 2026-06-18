@@ -1,6 +1,9 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { bonds } from '../../data/bonds'
+import { getBonds } from '../../api/bonds'
+import { createEmptyBondFilters, useBondFilter } from '../../composables/useBondFilter'
+
+const bonds = getBonds()
 
 const emit = defineEmits(['navigate'])
 
@@ -15,13 +18,8 @@ const filtersOpen = ref(false)
 const searchKeyword = ref(props.marketSearch?.keyword || '')
 const selectedBondCodes = ref([])
 const selectedFilters = ref({
-  bondTypes: props.marketSearch?.filters?.bondTypes || [],
-  maturities: props.marketSearch?.filters?.maturities || [],
-  yields: props.marketSearch?.filters?.yields || [],
-  ratings: props.marketSearch?.filters?.ratings || [],
-  interestCycles: props.marketSearch?.filters?.interestCycles || [],
-  optionTypes: props.marketSearch?.filters?.optionTypes || [],
-  seniorities: props.marketSearch?.filters?.seniorities || [],
+  ...createEmptyBondFilters(),
+  ...props.marketSearch?.filters,
 })
 
 const filterGroups = [
@@ -59,75 +57,11 @@ watch(() => props.marketSearch, (newVal) => {
   }
 }, { deep: true })
 
-function hasSelected(values) {
-  return Array.isArray(values) && values.length > 0
-}
-
-function matchesMaturity(bond, maturities) {
-  if (!hasSelected(maturities)) return true
-  return maturities.some((range) => {
-    if (range === '1년 이하') return bond.maturityYears <= 1
-    if (range === '1~3년') return bond.maturityYears > 1 && bond.maturityYears <= 3
-    if (range === '3~5년') return bond.maturityYears > 3 && bond.maturityYears <= 5
-    if (range === '5~10년') return bond.maturityYears > 5 && bond.maturityYears <= 10
-    if (range === '10년 이상') return bond.maturityYears >= 10
-    return true
-  })
-}
-
-function matchesYield(bond, yields) {
-  if (!hasSelected(yields)) return true
-  return yields.some((yieldText) => {
-    const threshold = Number(yieldText.replace(/[^0-9.]/g, ''))
-    return bond.yieldValue >= threshold
-  })
-}
-
-const filteredBonds = computed(() => {
-  const keyword = searchKeyword.value.toLowerCase()
-  const filters = selectedFilters.value
-
-  return bonds.filter((bond) => {
-    const matchesKeyword =
-      !keyword ||
-      bond.name.toLowerCase().includes(keyword) ||
-      bond.shortName.toLowerCase().includes(keyword) ||
-      bond.code.toLowerCase().includes(keyword) ||
-      bond.shortCode.toLowerCase().includes(keyword) ||
-      bond.issuer.toLowerCase().includes(keyword) ||
-      bond.type.toLowerCase().includes(keyword) ||
-      bond.option.toLowerCase().includes(keyword)
-
-    const matchesType = !hasSelected(filters.bondTypes) || filters.bondTypes.includes(bond.type)
-    const matchesRating = !hasSelected(filters.ratings) || filters.ratings.includes(bond.ratingGroup)
-    const matchesCycle = !hasSelected(filters.interestCycles) || filters.interestCycles.includes(bond.interestCycle)
-    const matchesOption = !hasSelected(filters.optionTypes) || filters.optionTypes.includes(bond.option)
-    const matchesSeniority = !hasSelected(filters.seniorities) || filters.seniorities.includes(bond.seniority)
-
-    return (
-      matchesKeyword &&
-      matchesType &&
-      matchesMaturity(bond, filters.maturities) &&
-      matchesYield(bond, filters.yields) &&
-      matchesRating &&
-      matchesCycle &&
-      matchesOption &&
-      matchesSeniority
-    )
-  })
-})
+const { filteredBonds } = useBondFilter(bonds, searchKeyword, selectedFilters)
 
 function resetFilters() {
   searchKeyword.value = ''
-  selectedFilters.value = {
-    bondTypes: [],
-    maturities: [],
-    yields: [],
-    ratings: [],
-    interestCycles: [],
-    optionTypes: [],
-    seniorities: [],
-  }
+  selectedFilters.value = createEmptyBondFilters()
 }
 
 function isBondSelected(code) {

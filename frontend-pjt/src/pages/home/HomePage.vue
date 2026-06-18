@@ -1,7 +1,10 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { indicators } from '../../data/indicators'
-import { bonds } from '../../data/bonds'
+import { getBonds } from '../../api/bonds'
+import { getIndicators } from '../../api/indicators'
+
+const bonds = getBonds()
+const indicators = getIndicators()
 
 const props = defineProps({
   isLoggedIn: {
