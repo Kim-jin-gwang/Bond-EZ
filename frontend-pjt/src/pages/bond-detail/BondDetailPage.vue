@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { fetchBondDetail, getSelectedBond } from '../../api/bonds'
 
 const props = defineProps({
@@ -13,6 +14,7 @@ const selectedBond = reactive({
   ...getSelectedBond(),
   ...props.selectedBond,
 })
+const route = useRoute()
 
 const investmentAmount = ref(1000000)
 const purchaseDate = ref('2026-06-14')
@@ -210,11 +212,13 @@ watch(() => props.selectedBond, (bond) => {
 })
 
 onMounted(async () => {
-  if (!selectedBond.bondId) {
+  const bondId = route.params.bondId || selectedBond.bondId
+
+  if (!bondId) {
     return
   }
 
-  const bond = await fetchBondDetail(selectedBond.bondId)
+  const bond = await fetchBondDetail(bondId)
   Object.assign(selectedBond, bond)
   purchasePrice.value = selectedBond.priceValue
 })

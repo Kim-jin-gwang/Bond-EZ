@@ -36,10 +36,21 @@ export function useNavigation() {
 
     if (page === 'compare') {
       appStore.setCompareBonds(payload?.bonds || appStore.compareBonds)
+      const ids = appStore.compareBonds.map((bond) => bond.bondId).filter(Boolean)
+      router.push({
+        name: 'compare',
+        query: ids.length === 2 ? { ids: ids.join(',') } : undefined,
+      })
+      return
     }
 
     if (page === 'detail') {
       appStore.setSelectedBond(payload?.bond || appStore.selectedBond)
+      router.push({
+        name: 'detail',
+        params: { bondId: appStore.selectedBond?.bondId || '' },
+      })
+      return
     }
 
     router.push({ name: routeNames[page] || 'home' })

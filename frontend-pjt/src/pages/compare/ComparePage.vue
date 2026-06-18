@@ -1,9 +1,11 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { fetchBondCompare, getBonds } from '../../api/bonds'
 
 const bonds = getBonds()
 const remoteCompareBonds = ref(null)
+const route = useRoute()
 
 const props = defineProps({
   compareBonds: {
@@ -219,7 +221,11 @@ function pickLower(leftValue, rightValue) {
 }
 
 onMounted(async () => {
-  const ids = props.compareBonds.map((bond) => bond.bondId).filter(Boolean)
+  const queryIds = String(route.query.ids || '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean)
+  const ids = queryIds.length === 2 ? queryIds : props.compareBonds.map((bond) => bond.bondId).filter(Boolean)
 
   if (ids.length !== 2) {
     return

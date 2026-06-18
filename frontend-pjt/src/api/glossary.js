@@ -24,6 +24,6 @@ function normalizeTerm(item) {
     category: category.category_name || item.category_name || '',
     level: item.difficulty || item.level || '',
     desc: item.description || item.desc || '',
-    example: item.example || '',
+    example: item.example_text || item.example || '',
   }
 }

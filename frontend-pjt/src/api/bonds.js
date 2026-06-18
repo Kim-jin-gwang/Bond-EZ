@@ -70,6 +70,10 @@ function normalizeBond(item) {
   const market = item?.latest_market_data || item?.market_data || item || {}
   const issuer = basic.issuer || item?.issuer || {}
   const industry = issuer.industry || item?.industry || {}
+  const paymentCycleMonths = interest.payment_cycle_months
+    || item?.payment_cycle_months
+    || interest.interest_payment_unit_months
+    || item?.interest_payment_unit_months
 
   return {
     ...base,
@@ -78,8 +82,8 @@ function normalizeBond(item) {
     shortName: basic.short_name || item?.short_name || base.shortName,
     code: basic.isin_code || item?.isin_code || base.code,
     shortCode: basic.short_code || item?.short_code || base.shortCode,
-    issuer: issuer.issuer_name || item?.issuer_name || base.issuer,
-    industry: industry.industry_name || item?.industry_name || base.industry,
+    issuer: issuer.issuer_name || basic.issuer_name || item?.issuer_name || base.issuer,
+    industry: industry.industry_name || basic.industry_name || item?.industry_name || base.industry,
     type: valueOrName(basic.bond_type || item?.bond_type, base.type),
     price: formatNumber(market.price, base.price),
     priceValue: toNumber(market.price, base.priceValue),
@@ -105,8 +109,8 @@ function normalizeBond(item) {
     couponRate: toNumber(interest.coupon_rate || item?.coupon_rate, base.couponRate),
     interestType: valueOrName(interest.interest_type || item?.interest_type, base.interestType),
     interestPaymentMethod: interest.interest_payment_method || item?.interest_payment_method || base.interestPaymentMethod,
-    interestCycle: formatMonthCycle(interest.payment_cycle_months || item?.payment_cycle_months, base.interestCycle),
-    paymentCycleMonths: toNumber(interest.payment_cycle_months || item?.payment_cycle_months, base.paymentCycleMonths),
+    interestCycle: formatMonthCycle(paymentCycleMonths, base.interestCycle),
+    paymentCycleMonths: toNumber(paymentCycleMonths, base.paymentCycleMonths),
     interestPaymentUnitMonths: toNumber(
       interest.interest_payment_unit_months || item?.interest_payment_unit_months,
       base.interestPaymentUnitMonths,
@@ -211,10 +215,10 @@ function normalizeOptionExercise(option, fallback) {
   }
 
   return {
-    startDate1: option.exercise_start_date_1 || option.start_date_1 || option.startDate1 || '',
+    startDate1: option.exercise_start_date_1 || option.start_date_1 || option.next_exercise_date || option.startDate1 || '',
     endDate1: option.exercise_end_date_1 || option.end_date_1 || option.endDate1 || '',
     startDate2: option.exercise_start_date_2 || option.start_date_2 || option.startDate2 || '',
     endDate2: option.exercise_end_date_2 || option.end_date_2 || option.endDate2 || '',
-    reason: option.exercise_reason || option.reason || '',
+    reason: option.exercise_reason || option.call_reason || option.reason || '',
   }
 }
