@@ -5,6 +5,7 @@ export const useAppStore = defineStore('app', {
     selectedIndicatorId: 'treasury-rate',
     marketSearch: null,
     compareBonds: [],
+    selectedBond: null,
     isLoggedIn: false,
     user: {
       name: '윤투자',
@@ -22,6 +23,9 @@ export const useAppStore = defineStore('app', {
     },
     setCompareBonds(bonds = []) {
       this.compareBonds = bonds
+    },
+    setSelectedBond(bond = null) {
+      this.selectedBond = bond
     },
     login() {
       this.isLoggedIn = true

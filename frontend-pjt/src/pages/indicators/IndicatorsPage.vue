@@ -1,8 +1,8 @@
 <script setup>
-import { computed, ref } from 'vue'
-import { getIndicators } from '../../api/indicators'
+import { computed, onMounted, ref } from 'vue'
+import { fetchIndicators, getIndicators } from '../../api/indicators'
 
-const indicators = getIndicators()
+const indicators = ref(getIndicators())
 
 const props = defineProps({
   selectedIndicatorId: {
@@ -14,7 +14,7 @@ const props = defineProps({
 const emit = defineEmits(['navigate'])
 
 const activeIndicator = computed(() => {
-  return indicators.find((indicator) => indicator.id === props.selectedIndicatorId) ?? indicators[0]
+  return indicators.value.find((indicator) => indicator.id === props.selectedIndicatorId) ?? indicators.value[0]
 })
 
 const creditRateView = ref('rates')
@@ -61,6 +61,10 @@ const barRows = computed(() => {
     value: row[1],
     height: bars[index] || 42,
   }))
+})
+
+onMounted(async () => {
+  indicators.value = await fetchIndicators()
 })
 </script>
 

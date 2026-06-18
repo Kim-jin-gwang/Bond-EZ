@@ -1,8 +1,18 @@
 <script setup>
-import { computed, ref } from 'vue'
-import { getSelectedBond } from '../../api/bonds'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { fetchBondDetail, getSelectedBond } from '../../api/bonds'
 
-const selectedBond = getSelectedBond()
+const props = defineProps({
+  selectedBond: {
+    type: Object,
+    default: null,
+  },
+})
+
+const selectedBond = reactive({
+  ...getSelectedBond(),
+  ...props.selectedBond,
+})
 
 const investmentAmount = ref(1000000)
 const purchaseDate = ref('2026-06-14')
@@ -189,6 +199,24 @@ const cashflowRows = computed(() => {
   }
 
   return rows
+})
+
+watch(() => props.selectedBond, (bond) => {
+  if (bond) {
+    Object.assign(selectedBond, bond)
+    purchasePrice.value = selectedBond.priceValue
+    scenario.value = selectedBond.optionType === 'CALL' ? 'call_1' : 'maturity'
+  }
+})
+
+onMounted(async () => {
+  if (!selectedBond.bondId) {
+    return
+  }
+
+  const bond = await fetchBondDetail(selectedBond.bondId)
+  Object.assign(selectedBond, bond)
+  purchasePrice.value = selectedBond.priceValue
 })
 
 function parsePercent(value) {

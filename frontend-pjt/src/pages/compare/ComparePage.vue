@@ -1,8 +1,9 @@
 <script setup>
-import { computed } from 'vue'
-import { getBonds } from '../../api/bonds'
+import { computed, onMounted, ref } from 'vue'
+import { fetchBondCompare, getBonds } from '../../api/bonds'
 
 const bonds = getBonds()
+const remoteCompareBonds = ref(null)
 
 const props = defineProps({
   compareBonds: {
@@ -12,6 +13,10 @@ const props = defineProps({
 })
 
 const displayedBonds = computed(() => {
+  if (remoteCompareBonds.value?.length === 2) {
+    return remoteCompareBonds.value
+  }
+
   if (props.compareBonds.length === 2) {
     return props.compareBonds
   }
@@ -212,6 +217,16 @@ function pickLower(leftValue, rightValue) {
   if (leftValue === rightValue) return '동일'
   return leftValue < rightValue ? leftBond.value.shortName : rightBond.value.shortName
 }
+
+onMounted(async () => {
+  const ids = props.compareBonds.map((bond) => bond.bondId).filter(Boolean)
+
+  if (ids.length !== 2) {
+    return
+  }
+
+  remoteCompareBonds.value = await fetchBondCompare(ids)
+})
 </script>
 
 <template>

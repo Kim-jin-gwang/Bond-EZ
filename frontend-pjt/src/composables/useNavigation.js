@@ -38,6 +38,10 @@ export function useNavigation() {
       appStore.setCompareBonds(payload?.bonds || appStore.compareBonds)
     }
 
+    if (page === 'detail') {
+      appStore.setSelectedBond(payload?.bond || appStore.selectedBond)
+    }
+
     router.push({ name: routeNames[page] || 'home' })
   }
 

@@ -1,10 +1,12 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { fetchNews } from '../../api/news'
 
 const keyword = ref('')
 const selectedPublisher = ref('전체')
 const selectedDate = ref('')
 const openedSummaryId = ref(null)
+const remoteNewsItems = ref(null)
 
 const newsItems = [
   {
@@ -54,12 +56,14 @@ const newsItems = [
   },
 ]
 
-const publishers = computed(() => ['전체', ...new Set(newsItems.map((item) => item.publisher))])
+const activeNewsItems = computed(() => remoteNewsItems.value?.length ? remoteNewsItems.value : newsItems)
+
+const publishers = computed(() => ['전체', ...new Set(activeNewsItems.value.map((item) => item.publisher))])
 
 const filteredNews = computed(() => {
   const normalizedKeyword = keyword.value.trim().toLowerCase()
 
-  return newsItems.filter((item) => {
+  return activeNewsItems.value.filter((item) => {
     const matchesKeyword =
       !normalizedKeyword ||
       item.title.toLowerCase().includes(normalizedKeyword) ||
@@ -81,6 +85,15 @@ function resetFilters() {
 function toggleSummary(id) {
   openedSummaryId.value = openedSummaryId.value === id ? null : id
 }
+
+onMounted(async () => {
+  try {
+    const items = await fetchNews()
+    remoteNewsItems.value = items.length ? items : null
+  } catch {
+    remoteNewsItems.value = null
+  }
+})
 </script>
 
 <template>

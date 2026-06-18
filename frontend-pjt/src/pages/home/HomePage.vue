@@ -1,10 +1,10 @@
 <script setup>
-import { computed, ref } from 'vue'
-import { getBonds } from '../../api/bonds'
-import { getIndicators } from '../../api/indicators'
+import { computed, onMounted, ref } from 'vue'
+import { fetchBonds, getBonds } from '../../api/bonds'
+import { fetchIndicators, getIndicators } from '../../api/indicators'
 
-const bonds = getBonds()
-const indicators = getIndicators()
+const bonds = ref(getBonds())
+const indicators = ref(getIndicators())
 
 const props = defineProps({
   isLoggedIn: {
@@ -39,10 +39,10 @@ const filterGroups = [
 ]
 
 const homeIndicatorCards = computed(() => {
-  const treasury = indicators.find((indicator) => indicator.id === 'treasury-rate')
-  const credit = indicators.find((indicator) => indicator.id === 'credit-rating-yield')
-  const deposit = indicators.find((indicator) => indicator.id === 'deposit-compare')
-  const spread = indicators.find((indicator) => indicator.id === 'yield-spread')
+  const treasury = indicators.value.find((indicator) => indicator.id === 'treasury-rate')
+  const credit = indicators.value.find((indicator) => indicator.id === 'credit-rating-yield')
+  const deposit = indicators.value.find((indicator) => indicator.id === 'deposit-compare')
+  const spread = indicators.value.find((indicator) => indicator.id === 'yield-spread')
 
   return [
     {
@@ -95,18 +95,18 @@ const homeIndicatorCards = computed(() => {
 
 const curatedBonds = computed(() => {
   if (!props.isLoggedIn) {
-    return bonds.slice(0, 4)
+    return bonds.value.slice(0, 4)
   }
 
   if (props.user.type === '안정추구형') {
-    return bonds.filter((bond) => bond.type === '국채' || bond.ratingGroup === 'AAA').slice(0, 4)
+    return bonds.value.filter((bond) => bond.type === '국채' || bond.ratingGroup === 'AAA').slice(0, 4)
   }
 
   if (props.user.type === '공격투자형') {
-    return [...bonds].sort((a, b) => b.yieldValue - a.yieldValue).slice(0, 4)
+    return [...bonds.value].sort((a, b) => b.yieldValue - a.yieldValue).slice(0, 4)
   }
 
-  return bonds.slice(0, 4)
+  return bonds.value.slice(0, 4)
 })
 
 function cloneFilters() {
@@ -138,6 +138,16 @@ function scrollIndicators(direction) {
     behavior: 'smooth',
   })
 }
+
+onMounted(async () => {
+  const [remoteBonds, remoteIndicators] = await Promise.all([
+    fetchBonds(),
+    fetchIndicators(),
+  ])
+
+  bonds.value = remoteBonds
+  indicators.value = remoteIndicators
+})
 </script>
 
 <template>

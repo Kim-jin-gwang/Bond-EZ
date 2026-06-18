@@ -31,6 +31,7 @@ watch(selectedIndicatorId, (indicatorId) => {
             :selected-indicator-id="selectedIndicatorId"
             :market-search="appStore.marketSearch"
             :compare-bonds="appStore.compareBonds"
+            :selected-bond="appStore.selectedBond"
             :is-logged-in="appStore.isLoggedIn"
             :user="appStore.user"
             :current-sub-page="currentSubPage"

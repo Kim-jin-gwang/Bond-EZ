@@ -1,8 +1,10 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { fetchGlossaryTerms } from '../../api/glossary'
 
 const keyword = ref('')
 const selectedCategory = ref('전체')
+const remoteTerms = ref(null)
 
 const terms = [
   {
@@ -210,12 +212,14 @@ const terms = [
   },
 ]
 
-const categories = computed(() => ['전체', ...new Set(terms.map((term) => term.category))])
+const activeTerms = computed(() => remoteTerms.value?.length ? remoteTerms.value : terms)
+
+const categories = computed(() => ['전체', ...new Set(activeTerms.value.map((term) => term.category))])
 
 const filteredTerms = computed(() => {
   const normalizedKeyword = keyword.value.trim().toLowerCase()
 
-  return terms.filter((term) => {
+  return activeTerms.value.filter((term) => {
     const matchesKeyword =
       !normalizedKeyword ||
       term.term.toLowerCase().includes(normalizedKeyword) ||
@@ -225,6 +229,15 @@ const filteredTerms = computed(() => {
 
     return matchesKeyword && matchesCategory
   })
+})
+
+onMounted(async () => {
+  try {
+    const items = await fetchGlossaryTerms()
+    remoteTerms.value = items.length ? items : null
+  } catch {
+    remoteTerms.value = null
+  }
 })
 </script>
 
@@ -258,7 +271,7 @@ const filteredTerms = computed(() => {
     <section class="dictionary-summary">
       <article>
         <span>전체 용어</span>
-        <strong>{{ terms.length }}개</strong>
+        <strong>{{ activeTerms.length }}개</strong>
       </article>
       <article>
         <span>현재 표시</span>

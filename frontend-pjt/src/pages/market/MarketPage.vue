@@ -231,7 +231,7 @@ function compareSelectedBonds() {
               <strong>{{ bond.maturity }}</strong>
               <span class="nowrap">{{ bond.interestCycle }} · {{ bond.interestType }}</span>
             </td>
-            <td><button class="small-action" type="button" @click="$emit('navigate', 'detail')">상세정보</button></td>
+            <td><button class="small-action" type="button" @click="$emit('navigate', 'detail', { bond })">상세정보</button></td>
           </tr>
           <tr v-if="!isLoading && filteredBonds.length === 0">
             <td colspan="10" class="empty-cell">
