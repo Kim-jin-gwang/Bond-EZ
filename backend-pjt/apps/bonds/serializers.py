@@ -122,6 +122,43 @@ def serialize_bond_detail(bond):
     }
 
 
+def serialize_bond_compare_item(bond):
+    latest_market_data = get_latest_market_data(bond)
+    cashflow = bond.cashflow_rule
+    option = bond.option_exercise
+
+    return {
+        "bond_id": bond.id,
+        "isin_code": bond.isin_code,
+        "short_code": bond.short_code,
+        "bond_name": bond.bond_name,
+        "short_name": bond.short_name,
+        "issuer_name": bond.issuer.issuer_name,
+        "industry_name": bond.issuer.industry.industry_name,
+        "bond_type": bond.bond_type.bond_type,
+        "credit_rating": bond.rating.rating_name,
+        "rating_group": bond.rating.rating_group,
+        "seniority": bond.seniority.seniority_name,
+        "guarantee_status": bond.guarantee_status.guarantee_status,
+        "issue_date": date_or_none(bond.issue_date),
+        "maturity_date": date_or_none(bond.maturity_date),
+        "coupon_rate": number_or_none(bond.coupon_rate),
+        "issue_amount": bond.issue_amount,
+        "underwriter": bond.underwriter,
+        "redemption_method": bond.redemption_method,
+        "maturity_redemption_rate": number_or_none(bond.maturity_redemption_rate),
+        "early_redemption_description": bond.early_redemption_description,
+        "interest_type": bond.interest_type,
+        "interest_payment_method": cashflow.interest_payment_method if cashflow else None,
+        "interest_payment_unit_months": cashflow.interest_payment_unit_months if cashflow else None,
+        "interest_calculation_months": cashflow.interest_calculation_months if cashflow else None,
+        "first_interest_payment_date": date_or_none(cashflow.first_interest_payment_date) if cashflow else None,
+        "option_type": option.option_type if option else "NONE",
+        "next_exercise_date": date_or_none(option.exercise_start_date_1) if option else None,
+        "latest_market_data": serialize_market_data(latest_market_data),
+    }
+
+
 def serialize_cashflow_rule(bond):
     cashflow = bond.cashflow_rule
     if cashflow is None:

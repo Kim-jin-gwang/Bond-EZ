@@ -99,6 +99,12 @@ def get_bond(bond_id):
     return base_bond_queryset().filter(id=bond_id).first()
 
 
+def get_bonds_for_compare(bond_ids):
+    bonds = base_bond_queryset().filter(id__in=bond_ids)
+    bonds_by_id = {bond.id: bond for bond in bonds}
+    return [bonds_by_id[bond_id] for bond_id in bond_ids if bond_id in bonds_by_id]
+
+
 def get_latest_market_data(bond_id):
     return (
         BondMarketData.objects.filter(bond_id=bond_id, deleted_at__isnull=True)
