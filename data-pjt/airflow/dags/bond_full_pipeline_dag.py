@@ -90,7 +90,7 @@ def run_spark_bond_batch():
             except: return len(rating_order)
         return max(ratings, key=rating_index)
 
-    raw_df = spark.read.format("kafka") \
+    raw_df = spark.readStream.format("kafka") \
         .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVERS) \
         .option("subscribe", "topic_bond_raw") \
         .option("startingOffsets", "earliest") \
@@ -116,21 +116,40 @@ def run_spark_bond_batch():
         .withColumn("guarantee_status", col("grnDcdNm")) \
         .withColumn("underwriter", col("bondUndtInstNm")) \
         .withColumn("credit_rating", get_lowest_rating(col("kisScrsItmsKcdNm"), col("kbpScrsItmsKcdNm"), col("niceScrsItmsKcdNm"), col("fnScrsItmsKcdNm"))) \
-        .select("isin_code", "bond_name", "company_id", "company_name", "industry", "issue_date", "maturity_date", "coupon_rate", "issue_amount", "bond_type", "seniority", "call_put_option", "interest_type", "payment_cycle", "guarantee_status", "underwriter", "credit_rating") \
-        .dropDuplicates(["isin_code"])
+        .select("isin_code", "bond_name", "company_id", "company_name", "industry", "issue_date", "maturity_date", "coupon_rate", "issue_amount", "bond_type", "seniority", "call_put_option", "interest_type", "payment_cycle", "guarantee_status", "underwriter", "credit_rating")
 
     JDBC_URL = f"jdbc:postgresql://{DB_HOST}:{DB_PORT}/{POSTGRES_DB}"
     JDBC_PROPERTIES = {"user": POSTGRES_USER, "password": POSTGRES_PASSWORD, "driver": "org.postgresql.Driver"}
+    CHECKPOINT_PATH = "/opt/airflow/dags/spark_checkpoints/bond_raw"
 
-    final_df.write.jdbc(url=JDBC_URL, table="temp_bonds_master_staging", mode="overwrite", properties=JDBC_PROPERTIES)
+    def write_to_postgres_upsert(batch_df, batch_id):
+        # 마이크로 배치 DataFrame에서 중복 제거
+        deduped_df = batch_df.dropDuplicates(["isin_code"])
+        
+        # 임시 테이블에 쓰기 (Overwrite)
+        deduped_df.write.jdbc(url=JDBC_URL, table="temp_bonds_master_staging", mode="overwrite", properties=JDBC_PROPERTIES)
+        
+        # PostgreSQL Upsert 실행
+        conn = psycopg2.connect(host=DB_HOST, port=DB_PORT, database=POSTGRES_DB, user=POSTGRES_USER, password=POSTGRES_PASSWORD)
+        cur = conn.cursor()
+        try:
+            cur.execute("SELECT normalize_bonds_staging();")
+            cur.execute("DROP TABLE temp_bonds_master_staging;")
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            cur.close()
+            conn.close()
 
-    conn = psycopg2.connect(host=DB_HOST, port=DB_PORT, database=POSTGRES_DB, user=POSTGRES_USER, password=POSTGRES_PASSWORD)
-    cur = conn.cursor()
-    cur.execute("SELECT normalize_bonds_staging();")
-    cur.execute("DROP TABLE temp_bonds_master_staging;")
-    conn.commit()
-    cur.close()
-    conn.close()
+    query = final_df.writeStream \
+        .foreachBatch(write_to_postgres_upsert) \
+        .trigger(availableNow=True) \
+        .option("checkpointLocation", CHECKPOINT_PATH) \
+        .start()
+
+    query.awaitTermination()
     spark.stop()
 
 # Helper functions for types and date addition
