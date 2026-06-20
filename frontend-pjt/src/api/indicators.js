@@ -3,7 +3,7 @@ import { apiGet } from './client'
 
 const INDICATOR_META = {
   'treasury-rate': {
-    shortTitle: '국고채·미국채',
+    shortTitle: '나라별 금리',
     summary: '국고채와 미국채 금리를 비교해 시장이 반영하는 장단기 금리 수준을 확인합니다.',
     insight: '장기 금리가 단기 금리보다 높거나 낮은지 함께 보면 금리 방향성과 만기 부담을 판단하는 데 도움이 됩니다.',
   },

@@ -55,7 +55,7 @@ const homeIndicatorCards = computed(() => {
   return [
     {
       ...treasury,
-      title: '국채·기준금리',
+      title: '나라별 금리',
       variant: 'table',
       rows: (treasury?.treasuryRates || []).map((row) => [
         row.country,

@@ -18,7 +18,9 @@ const activeIndicator = computed(() => {
 })
 
 const visibleIndicators = computed(() =>
-  indicators.value.filter((indicator) => indicator.id !== 'central-bank-rate'),
+  ['treasury-rate', 'yield-spread', 'credit-rating-yield', 'deposit-compare', 'yield-curve']
+    .map((id) => indicators.value.find((indicator) => indicator.id === id))
+    .filter(Boolean),
 )
 const treasuryIndicator = computed(() => indicators.value.find((indicator) => indicator.id === 'treasury-rate'))
 const centralBankIndicator = computed(() => indicators.value.find((indicator) => indicator.id === 'central-bank-rate'))
