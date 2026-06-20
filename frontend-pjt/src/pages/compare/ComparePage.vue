@@ -106,21 +106,21 @@ const compareSections = computed(() => [
 
 const quickJudgements = computed(() => [
   {
-    label: '수익률 우위',
+    label: '매수수익률 높음',
     value: pickHigher(leftBond.value.yieldValue, rightBond.value.yieldValue),
-    helper: '매수수익률이 높은 채권',
+    helper: '두 채권 중 매수수익률 수치가 더 높습니다',
     tone: 'return',
   },
   {
-    label: '만기 부담 낮음',
+    label: '잔존만기 짧음',
     value: pickLower(leftBond.value.maturityYears, rightBond.value.maturityYears),
-    helper: '잔존만기가 짧은 채권',
+    helper: '두 채권 중 잔존만기 수치가 더 짧습니다',
     tone: 'stability',
   },
   {
-    label: '금리 민감도 낮음',
+    label: '듀레이션 낮음',
     value: pickLower(leftBond.value.durationValue, rightBond.value.durationValue),
-    helper: '듀레이션이 짧아 가격 변동 부담이 낮은 채권',
+    helper: '두 채권 중 듀레이션 수치가 더 낮습니다',
     tone: 'risk',
   },
 ])
@@ -128,7 +128,7 @@ const quickJudgements = computed(() => [
 const gptSummary = computed(() => {
   const higherYieldBond = leftBond.value.yieldValue >= rightBond.value.yieldValue ? leftBond.value : rightBond.value
   const lowerDurationBond = leftBond.value.durationValue <= rightBond.value.durationValue ? leftBond.value : rightBond.value
-  const saferRatingBond = getWinner(leftBond.value.rating, rightBond.value.rating, 'rating') === 'right'
+  const higherRatingBond = getHigherRatingSide(leftBond.value.rating, rightBond.value.rating) === 'right'
     ? rightBond.value
     : leftBond.value
   const hasCallable = displayedBonds.value.filter((bond) => bond.optionType === 'CALL')
@@ -136,14 +136,14 @@ const gptSummary = computed(() => {
   return {
     headline: `두 채권은 수익률, 신용등급, 만기, 듀레이션, 옵션 조건에서 차이가 있으므로 투자 목적과 보유 기간에 맞춰 추가 확인이 필요합니다.`,
     bullets: [
-      `수익률만 보면 ${higherYieldBond.shortName}의 매수수익률이 ${higherYieldBond.buyYield}로 더 높습니다. 다만 높은 수익률은 신용위험, 유동성, 옵션 조건과 함께 확인해야 합니다.`,
-      `금리 민감도는 ${lowerDurationBond.shortName}의 듀레이션이 ${lowerDurationBond.duration}로 더 낮아 상대적으로 작게 나타납니다.`,
-      `신용등급 기준으로는 ${saferRatingBond.shortName}이 더 높은 안정성 지표를 보입니다. 단, 신용등급은 원리금 상환을 보장하지 않습니다.`,
+      `${higherYieldBond.shortName}의 매수수익률 수치가 ${higherYieldBond.buyYield}로 더 높게 표시됩니다. 수익률 수치가 높다는 사실은 신용위험, 유동성, 옵션 조건과 함께 해석해야 합니다.`,
+      `${lowerDurationBond.shortName}의 듀레이션 수치가 ${lowerDurationBond.duration}로 더 낮게 표시됩니다. 듀레이션은 가격 변동 민감도를 보는 참고 지표 중 하나입니다.`,
+      `신용등급 표기는 ${higherRatingBond.shortName}이 더 높은 등급으로 표시됩니다. 단, 신용등급은 원리금 상환을 보장하지 않으며 투자 적합성을 의미하지 않습니다.`,
       hasCallable.length
         ? `${hasCallable.map((bond) => bond.shortName).join(', ')}은 CALL 옵션이 있으므로 행사 가능일, 조기상환 조건, 재투자 위험을 확인해야 합니다.`
         : '두 채권 모두 별도 CALL 옵션 항목은 확인되지 않습니다.',
     ],
-    conclusion: '이 요약은 투자 권유나 매수 추천이 아니라 비교 데이터 해석을 돕기 위한 참고 정보입니다. 실제 투자 전에는 본인의 투자 목적, 위험 감수 성향, 보유 가능 기간, 세금 및 수수료를 함께 검토해야 합니다.',
+    conclusion: '이 화면은 투자 권유, 매수·매도 추천, 상품의 우수성 판단을 제공하지 않습니다. 표시된 내용은 입력된 데이터 기준의 단순 비교 정보이며, 수익률이 높거나 듀레이션이 낮다는 사실이 특정 채권의 적합성 또는 안정성을 의미하지 않습니다. 투자 전 투자설명서, 신용위험, 유동성, 만기, 세금 및 수수료를 반드시 확인하세요.',
   }
 })
 
@@ -152,7 +152,6 @@ function row(label, key, compareType = null, suffix = '') {
     label,
     left: formatValue(leftBond.value[key], suffix),
     right: formatValue(rightBond.value[key], suffix),
-    winner: getWinner(leftBond.value[key], rightBond.value[key], compareType),
   }
 }
 
@@ -161,7 +160,6 @@ function customRow(label, getter) {
     label,
     left: getter(leftBond.value),
     right: getter(rightBond.value),
-    winner: null,
   }
 }
 
@@ -173,37 +171,14 @@ function formatValue(value, suffix = '') {
   return suffix ? `${value}${suffix}` : value
 }
 
-function getWinner(leftValue, rightValue, compareType) {
-  if (!compareType) return null
-
-  if (compareType === 'rating') {
-    const order = ['국채', 'AAA', 'AA', 'A', 'BBB', 'BB', 'B']
-    const leftIndex = order.findIndex((item) => String(leftValue).startsWith(item))
-    const rightIndex = order.findIndex((item) => String(rightValue).startsWith(item))
-    if (leftIndex === rightIndex) return null
-    if (leftIndex === -1) return 'right'
-    if (rightIndex === -1) return 'left'
-    return leftIndex < rightIndex ? 'left' : 'right'
-  }
-
-  const leftNumber = toNumber(leftValue)
-  const rightNumber = toNumber(rightValue)
-
-  if (leftNumber === rightNumber) return null
-
-  if (compareType.startsWith('higher')) {
-    return leftNumber > rightNumber ? 'left' : 'right'
-  }
-
-  if (compareType.startsWith('lower')) {
-    return leftNumber < rightNumber ? 'left' : 'right'
-  }
-
-  if (compareType === 'change') {
-    return leftNumber > rightNumber ? 'left' : 'right'
-  }
-
-  return null
+function getHigherRatingSide(leftValue, rightValue) {
+  const order = ['국채', 'AAA', 'AA', 'A', 'BBB', 'BB', 'B']
+  const leftIndex = order.findIndex((item) => String(leftValue).startsWith(item))
+  const rightIndex = order.findIndex((item) => String(rightValue).startsWith(item))
+  if (leftIndex === rightIndex) return 'left'
+  if (leftIndex === -1) return 'right'
+  if (rightIndex === -1) return 'left'
+  return leftIndex < rightIndex ? 'left' : 'right'
 }
 
 function toNumber(value) {
@@ -269,7 +244,7 @@ onMounted(async () => {
 
     <section class="judgement-grid">
       <article v-for="item in quickJudgements" :key="item.label" :class="item.tone">
-        <span class="winner-label">우위</span>
+        <span class="criterion-label">비교 기준</span>
         <span>{{ item.label }}</span>
         <strong>{{ item.value }}</strong>
         <small>{{ item.helper }}</small>
@@ -279,8 +254,8 @@ onMounted(async () => {
     <section class="gpt-summary-panel">
       <header>
         <div>
-          <p class="eyebrow">AI Compare Summary</p>
-          <h2>비교 요약</h2>
+          <p class="eyebrow">Data Compare Summary</p>
+          <h2>데이터 비교 요약</h2>
         </div>
         <span>참고용</span>
       </header>
@@ -310,8 +285,8 @@ onMounted(async () => {
         </div>
         <div v-for="item in section.rows" :key="`${section.title}-${item.label}`" class="compare-row">
           <span>{{ item.label }}</span>
-          <strong :class="{ better: item.winner === 'left' }">{{ item.left }}</strong>
-          <strong :class="{ better: item.winner === 'right' }">{{ item.right }}</strong>
+          <strong>{{ item.left }}</strong>
+          <strong>{{ item.right }}</strong>
         </div>
       </div>
     </section>
@@ -426,7 +401,7 @@ onMounted(async () => {
   background: var(--accent);
 }
 
-.winner-label {
+.criterion-label {
   width: fit-content;
   border-radius: 4px;
   padding: 3px 7px;
@@ -436,11 +411,11 @@ onMounted(async () => {
   font-weight: 900;
 }
 
-.judgement-grid article.return .winner-label {
+.judgement-grid article.return .criterion-label {
   background: var(--good);
 }
 
-.judgement-grid article.risk .winner-label {
+.judgement-grid article.risk .criterion-label {
   background: var(--accent);
 }
 
@@ -551,15 +526,6 @@ onMounted(async () => {
 
 .compare-row.header strong {
   color: var(--primary-dark);
-}
-
-.better {
-  display: inline-flex;
-  width: fit-content;
-  border-radius: 6px;
-  padding: 4px 8px;
-  color: var(--good);
-  background: #e7f6f0;
 }
 
 @media (max-width: 920px) {
