@@ -1,18 +1,17 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { fetchBonds, getBonds } from '../../api/bonds'
+import { fetchBonds } from '../../api/bonds'
 import { useAsyncData } from '../../composables/useAsyncData'
 import { createEmptyBondFilters, useBondFilter } from '../../composables/useBondFilter'
 import { useDebouncedRef } from '../../composables/useDebouncedRef'
 
-const initialBonds = getBonds()
 const {
   data: bonds,
   isLoading,
   error,
   execute: reloadBonds,
 } = useAsyncData(fetchBonds, {
-  initialData: initialBonds,
+  initialData: [],
 })
 
 const emit = defineEmits(['navigate'])

@@ -1,8 +1,8 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { fetchIndicators, getIndicators } from '../../api/indicators'
+import { fetchIndicators } from '../../api/indicators'
 
-const indicators = ref(getIndicators())
+const indicators = ref([])
 
 const props = defineProps({
   selectedIndicatorId: {
@@ -53,8 +53,8 @@ const creditTableColumns = computed(() => creditRateView.value === 'rates' ? gra
 const creditTableRows = computed(() => creditRateView.value === 'rates' ? gradedRateRows : spreadRows)
 
 const barRows = computed(() => {
-  const rows = activeIndicator.value.tableRows || []
-  const bars = activeIndicator.value.bars || []
+  const rows = activeIndicator.value?.tableRows || []
+  const bars = activeIndicator.value?.bars || []
 
   return rows.map((row, index) => ({
     label: row[0],
@@ -88,7 +88,7 @@ onMounted(async () => {
       </button>
     </div>
 
-    <article v-if="activeIndicator.id === 'credit-rating-yield'" class="credit-rate-board">
+    <article v-if="activeIndicator && activeIndicator.id === 'credit-rating-yield'" class="credit-rate-board">
       <header class="credit-board-header">
         <div>
           <p class="eyebrow">Credit Rating Rates</p>
@@ -149,7 +149,7 @@ onMounted(async () => {
       </section>
     </article>
 
-    <article v-else class="indicator-detail-card">
+    <article v-else-if="activeIndicator" class="indicator-detail-card">
       <header class="indicator-detail-header">
         <div>
           <p class="eyebrow">Indicator Report</p>

@@ -56,7 +56,7 @@ const newsItems = [
   },
 ]
 
-const activeNewsItems = computed(() => remoteNewsItems.value?.length ? remoteNewsItems.value : newsItems)
+const activeNewsItems = computed(() => remoteNewsItems.value || [])
 
 const publishers = computed(() => ['전체', ...new Set(activeNewsItems.value.map((item) => item.publisher))])
 
@@ -89,9 +89,9 @@ function toggleSummary(id) {
 onMounted(async () => {
   try {
     const items = await fetchNews()
-    remoteNewsItems.value = items.length ? items : null
+    remoteNewsItems.value = items
   } catch {
-    remoteNewsItems.value = null
+    remoteNewsItems.value = []
   }
 })
 </script>

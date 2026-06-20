@@ -1,9 +1,8 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { fetchBondCompare, getBonds } from '../../api/bonds'
+import { fetchBondCompare } from '../../api/bonds'
 
-const bonds = getBonds()
 const remoteCompareBonds = ref(null)
 const route = useRoute()
 
@@ -23,11 +22,12 @@ const displayedBonds = computed(() => {
     return props.compareBonds
   }
 
-  return bonds.slice(0, 2)
+  return []
 })
 
-const leftBond = computed(() => displayedBonds.value[0])
-const rightBond = computed(() => displayedBonds.value[1])
+const hasComparisonData = computed(() => displayedBonds.value.length === 2)
+const leftBond = computed(() => displayedBonds.value[0] || {})
+const rightBond = computed(() => displayedBonds.value[1] || {})
 
 const compareSections = computed(() => [
   {
@@ -236,7 +236,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="page compare-page">
+  <section v-if="hasComparisonData" class="page compare-page">
     <div class="page-heading compact">
       <p class="eyebrow">채권 비교</p>
       <h1 class="compare-title">{{ leftBond.shortName }} vs {{ rightBond.shortName }}</h1>

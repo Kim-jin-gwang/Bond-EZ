@@ -11,7 +11,7 @@ const indicator = computed(() => indicators.find(i => i.id === 'credit-rating-yi
 </script>
 
 <template>
-  <div class="indicator-content">
+  <div v-if="indicator" class="indicator-content">
     <section class="insight-panel">
       <div>
         <p class="eyebrow">투자 지표 상세 보기</p>

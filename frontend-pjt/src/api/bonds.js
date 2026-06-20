@@ -1,9 +1,8 @@
-import { bonds, selectedBond } from '../data/bonds'
 import { cachedQuery } from './cache'
 import { apiGet } from './client'
 
 export function getBonds() {
-  return bonds
+  return []
 }
 
 export function fetchBonds() {
@@ -11,24 +10,28 @@ export function fetchBonds() {
     try {
       const data = await apiGet('/bonds')
       const items = getItems(data)
-      return items.length ? items.map(normalizeBond) : bonds
+      return items.map(normalizeBond)
     } catch {
-      return bonds
+      return []
     }
   })
 }
 
 export function getSelectedBond() {
-  return selectedBond
+  return null
 }
 
-export function fetchBondDetail(bondId = selectedBond.bondId) {
+export function fetchBondDetail(bondId) {
   return cachedQuery(`bonds:detail:${bondId}`, async () => {
+    if (!bondId) {
+      return null
+    }
+
     try {
       const data = await apiGet(`/bonds/${bondId}`)
       return normalizeBond(data)
     } catch {
-      return selectedBond
+      return null
     }
   })
 }
@@ -38,15 +41,15 @@ export function fetchBondCompare(ids) {
 
   return cachedQuery(`bonds:compare:${compareIds.join(',')}`, async () => {
     if (compareIds.length !== 2) {
-      return bonds.slice(0, 2)
+      return []
     }
 
     try {
       const data = await apiGet('/bonds/compare', { params: { ids: compareIds } })
       const items = getItems(data)
-      return items.length === 2 ? items.map(normalizeBond) : bonds.slice(0, 2)
+      return items.length === 2 ? items.map(normalizeBond) : []
     } catch {
-      return bonds.slice(0, 2)
+      return []
     }
   })
 }
@@ -60,9 +63,7 @@ function getItems(data) {
 }
 
 function normalizeBond(item) {
-  const base = bonds.find((bond) => String(bond.bondId) === String(item?.bond_id || item?.id))
-    || bonds.find((bond) => bond.code === item?.isin_code)
-    || selectedBond
+  const base = {}
   const basic = item?.basic_info || item || {}
   const issue = item?.issue_redemption || item || {}
   const interest = item?.interest_condition || item || {}

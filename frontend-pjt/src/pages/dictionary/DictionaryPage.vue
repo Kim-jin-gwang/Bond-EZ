@@ -212,7 +212,7 @@ const terms = [
   },
 ]
 
-const activeTerms = computed(() => remoteTerms.value?.length ? remoteTerms.value : terms)
+const activeTerms = computed(() => remoteTerms.value || [])
 
 const categories = computed(() => ['전체', ...new Set(activeTerms.value.map((term) => term.category))])
 
@@ -234,9 +234,9 @@ const filteredTerms = computed(() => {
 onMounted(async () => {
   try {
     const items = await fetchGlossaryTerms()
-    remoteTerms.value = items.length ? items : null
+    remoteTerms.value = items
   } catch {
-    remoteTerms.value = null
+    remoteTerms.value = []
   }
 })
 </script>

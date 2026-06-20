@@ -1,10 +1,10 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { fetchBonds, getBonds } from '../../api/bonds'
-import { fetchIndicators, getIndicators } from '../../api/indicators'
+import { fetchBonds } from '../../api/bonds'
+import { fetchIndicators } from '../../api/indicators'
 
-const bonds = ref(getBonds())
-const indicators = ref(getIndicators())
+const bonds = ref([])
+const indicators = ref([])
 
 const props = defineProps({
   isLoggedIn: {
@@ -39,6 +39,10 @@ const filterGroups = [
 ]
 
 const homeIndicatorCards = computed(() => {
+  if (!indicators.value.length) {
+    return []
+  }
+
   const treasury = indicators.value.find((indicator) => indicator.id === 'treasury-rate')
   const credit = indicators.value.find((indicator) => indicator.id === 'credit-rating-yield')
   const deposit = indicators.value.find((indicator) => indicator.id === 'deposit-compare')
@@ -313,7 +317,7 @@ onMounted(async () => {
               <span class="label">매수수익률</span>
               <span class="value">{{ bond.buyYield }}</span>
             </div>
-            <button class="btn-more" type="button" @click="$emit('navigate', 'detail')">상세</button>
+            <button class="btn-more" type="button" @click="$emit('navigate', 'detail', { bond })">상세</button>
           </div>
         </article>
       </div>

@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { fetchBondDetail, getSelectedBond } from '../../api/bonds'
+import { fetchBondDetail } from '../../api/bonds'
 
 const props = defineProps({
   selectedBond: {
@@ -11,10 +11,10 @@ const props = defineProps({
 })
 
 const selectedBond = reactive({
-  ...getSelectedBond(),
   ...props.selectedBond,
 })
 const route = useRoute()
+const hasBondData = computed(() => Boolean(selectedBond.bondId || selectedBond.code))
 
 const investmentAmount = ref(1000000)
 const purchaseDate = ref('2026-06-14')
@@ -219,8 +219,10 @@ onMounted(async () => {
   }
 
   const bond = await fetchBondDetail(bondId)
-  Object.assign(selectedBond, bond)
-  purchasePrice.value = selectedBond.priceValue
+  if (bond) {
+    Object.assign(selectedBond, bond)
+    purchasePrice.value = selectedBond.priceValue
+  }
 })
 
 function parsePercent(value) {
@@ -259,7 +261,7 @@ function formatCurrency(value) {
 </script>
 
 <template>
-  <section class="page detail-page erd-detail">
+  <section v-if="hasBondData" class="page detail-page erd-detail">
     <section class="detail-summary">
       <div class="summary-copy">
         <p class="eyebrow">Bond Detail</p>
