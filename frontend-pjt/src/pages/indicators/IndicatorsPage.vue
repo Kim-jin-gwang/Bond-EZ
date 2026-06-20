@@ -18,12 +18,13 @@ const activeIndicator = computed(() => {
 })
 
 const visibleIndicators = computed(() =>
-  ['treasury-rate', 'yield-spread', 'credit-rating-yield', 'deposit-compare', 'yield-curve']
+  ['treasury-rate', 'yield-spread', 'yield-curve', 'credit-rating-yield', 'deposit-compare']
     .map((id) => indicators.value.find((indicator) => indicator.id === id))
     .filter(Boolean),
 )
 const treasuryIndicator = computed(() => indicators.value.find((indicator) => indicator.id === 'treasury-rate'))
 const centralBankIndicator = computed(() => indicators.value.find((indicator) => indicator.id === 'central-bank-rate'))
+const yieldSpreadIndicator = computed(() => indicators.value.find((indicator) => indicator.id === 'yield-spread'))
 const isRateDashboard = computed(() =>
   activeIndicator.value?.id === 'treasury-rate' || activeIndicator.value?.id === 'central-bank-rate',
 )
@@ -122,6 +123,16 @@ const baseRateSummaryCards = computed(() =>
   })),
 )
 
+const rateSpreadSummaryCards = computed(() =>
+  yieldSpreadRows.value.map((row) => ({
+    country: row.country,
+    value: row.value,
+    state: row.state,
+    tone: row.tone,
+    isNegative: row.spread < 0,
+  })),
+)
+
 const rateDashboardInterpretation = computed(() => {
   const rows = rateDashboardRows.value
   const korea = rows.find((row) => row.country.includes('한국') || row.country.includes('대한민국'))
@@ -141,13 +152,56 @@ const rateDashboardInterpretation = computed(() => {
     japan && Number.isFinite(japan.baseRate) && Number.isFinite(japan.rate10y)
       ? '일본은 기준금리와 장기금리 모두 낮은 편이라, 다른 국가보다 완화적인 금리 환경으로 볼 수 있습니다.'
       : '일본 금리 데이터가 충분하지 않습니다.',
-    '이 화면은 국가별 금리 수준을 비교하는 용도이며, 장단기 금리차 해석은 별도의 장단기 금리차 페이지에서 확인하는 것이 좋습니다.',
+    '장단기 금리차는 아래 요약에서 빠르게 확인하고, 0%p 기준의 상세 해석은 장단기 금리차 페이지에서 확인할 수 있습니다.',
   ]
 })
 
 const rateDashboardValue = computed(() => {
   const korea = rateDashboardRows.value.find((row) => row.country.includes('한국') || row.country.includes('대한민국'))
   return formatRate(korea?.rate10y ?? rateDashboardRows.value[0]?.rate10y)
+})
+
+const yieldSpreadRows = computed(() => {
+  const rows = yieldSpreadIndicator.value?.tableRows || []
+
+  return rows.map((row) => {
+    const spread = parseRate(row[1])
+
+    return {
+      country: row[0],
+      spread,
+      value: formatRateGap(spread),
+      state: getSpreadState(spread),
+      tone: getCountryTone(row[0]),
+    }
+  })
+})
+
+const yieldSpreadValue = computed(() => {
+  const korea = yieldSpreadRows.value.find((row) => row.country.includes('한국') || row.country.includes('대한민국'))
+  return korea?.value ?? yieldSpreadRows.value[0]?.value ?? '-'
+})
+
+const yieldSpreadInterpretation = computed(() => {
+  const rows = yieldSpreadRows.value
+  const positiveRows = rows.filter((row) => Number.isFinite(row.spread) && row.spread > 0)
+  const negativeRows = rows.filter((row) => Number.isFinite(row.spread) && row.spread < 0)
+  const widest = rows
+    .filter((row) => Number.isFinite(row.spread))
+    .sort((a, b) => Math.abs(b.spread) - Math.abs(a.spread))[0]
+
+  return [
+    positiveRows.length
+      ? `${positiveRows.map((row) => row.country).join(', ')}은 10년 금리가 3년 금리보다 높아 일반적인 우상향 금리 구조로 보입니다.`
+      : '10년 금리가 3년 금리보다 높은 국가가 없어 장단기 금리 구조가 평탄하거나 역전된 상태로 볼 수 있습니다.',
+    negativeRows.length
+      ? `${negativeRows.map((row) => row.country).join(', ')}은 장단기 금리차가 마이너스로, 단기 금리가 장기 금리보다 높은 역전 구간입니다.`
+      : '현재 표시된 국가들은 장단기 금리차가 모두 플러스라 역전 구간은 보이지 않습니다.',
+    widest
+      ? `${widest.country}의 금리차가 ${widest.value}로 가장 크게 벌어져 있어, 다른 국가보다 장단기 금리 기울기가 더 뚜렷합니다.`
+      : '금리차 데이터가 충분하지 않아 국가별 기울기 차이를 비교하기 어렵습니다.',
+    '금리차가 0%p에 가까워질수록 장기와 단기 금리 차이가 작아진 것이며, 경기 기대나 통화정책 전망이 빠르게 바뀔 때 평탄화가 나타날 수 있습니다.',
+  ]
 })
 
 const treasuryAxisTicks = [10, 5, 0]
@@ -160,6 +214,11 @@ function formatRate(value) {
   return Number.isFinite(value) ? `${value.toFixed(2)}%` : '-'
 }
 
+function formatRateGap(value) {
+  if (!Number.isFinite(value)) return '-'
+  return `${value > 0 ? '+' : ''}${value.toFixed(2)}%p`
+}
+
 function parseRate(value) {
   const number = Number(String(value ?? '').replace(/[^0-9.-]/g, ''))
   return Number.isFinite(number) ? number : null
@@ -167,6 +226,26 @@ function parseRate(value) {
 
 function treasuryBarHeight(rate) {
   return Number.isFinite(rate) ? `${Math.max(4, (rate / 10) * 100)}%` : '4%'
+}
+
+function getSpreadState(spread) {
+  if (!Number.isFinite(spread)) return '데이터 없음'
+  if (spread < 0) return '역전 구간'
+  if (isFlatSpread(spread)) return '평탄 구간'
+  return '정상 구간'
+}
+
+function isFlatSpread(spread) {
+  return Number.isFinite(spread) && spread >= 0 && spread <= 0.15
+}
+
+function spreadBarStyle(spread) {
+  if (!Number.isFinite(spread)) return {}
+
+  const width = Math.min(50, (Math.abs(spread) / 1.5) * 50)
+  return spread >= 0
+    ? { left: '50%', width: `${width}%` }
+    : { right: '50%', width: `${width}%` }
 }
 
 function getCountryTone(country) {
@@ -205,18 +284,18 @@ onMounted(async () => {
       <header class="indicator-detail-header">
         <div>
           <p class="eyebrow">Indicator Report</p>
-          <h2>국채·미국채 금리와 기준금리</h2>
+          <h2>나라별 금리</h2>
         </div>
         <div class="indicator-current-value">
           <span>한국 10년물 기준</span>
           <strong>{{ rateDashboardValue }}</strong>
-          <small>기준금리와 3년·10년 금리 비교</small>
+          <small>기준금리와 3년·10년 금리 수준 비교</small>
         </div>
       </header>
 
       <section class="indicator-explanation">
         <h3>개념 설명</h3>
-        <p>국가별 기준금리와 3년·10년 국채 금리를 함께 비교해 통화정책 수준과 장단기 금리 구조를 확인합니다.</p>
+        <p>국가별 기준금리와 3년·10년 국채 금리를 함께 비교해 통화정책 수준과 금리 수준 차이를 확인합니다.</p>
       </section>
 
       <section class="indicator-table-panel treasury-table-panel">
@@ -262,13 +341,34 @@ onMounted(async () => {
         </article>
       </section>
 
+      <section v-if="rateSpreadSummaryCards.length" class="rate-spread-summary-panel" aria-label="장단기 금리차 요약">
+        <div class="panel-title">
+          <div>
+            <h3>장단기 금리차 요약</h3>
+            <p>10년 금리에서 3년 금리를 뺀 값입니다. 상세 해석은 별도 페이지에서 확인합니다.</p>
+          </div>
+          <button type="button" @click="$emit('navigate', 'indicators', 'yield-spread')">자세히 보기</button>
+        </div>
+        <div class="rate-spread-summary-grid">
+          <article
+            v-for="card in rateSpreadSummaryCards"
+            :key="`${card.country}-spread-quick`"
+            :class="card.tone"
+          >
+            <span>{{ card.country }}</span>
+            <strong :class="{ negative: card.isNegative }">{{ card.value }}</strong>
+            <small :class="{ negative: card.isNegative }">{{ card.state }}</small>
+          </article>
+        </div>
+      </section>
+
       <section class="indicator-chart-panel treasury-chart-panel">
         <div class="panel-title">
           <div>
             <h3>그래프 읽는 법</h3>
             <p>단위: %, 세로축 0~10%</p>
           </div>
-          <span>기준금리·3년·10년 금리 비교</span>
+          <span>국가별 3년·10년 금리 수준 비교</span>
         </div>
 
         <div class="treasury-chart-grid" aria-label="한국 미국 일본 3년 10년 금리 그래프">
@@ -314,6 +414,113 @@ onMounted(async () => {
           <h4>데이터 해석</h4>
           <ul>
             <li v-for="item in rateDashboardInterpretation" :key="item">{{ item }}</li>
+          </ul>
+        </section>
+      </section>
+    </article>
+
+    <article v-else-if="activeIndicator && activeIndicator.id === 'yield-spread'" class="indicator-detail-card spread-detail-card">
+      <header class="indicator-detail-header">
+        <div>
+          <p class="eyebrow">Indicator Report</p>
+          <h2>장단기 금리차</h2>
+        </div>
+        <div class="indicator-current-value">
+          <span>한국 기준</span>
+          <strong>{{ yieldSpreadValue }}</strong>
+          <small>10년 금리 - 3년 금리</small>
+        </div>
+      </header>
+
+      <section class="indicator-explanation">
+        <h3>개념 설명</h3>
+        <p>10년 금리에서 3년 금리를 뺀 값입니다. 플러스면 장기 금리가 단기 금리보다 높고, 마이너스면 단기 금리가 장기 금리보다 높은 역전 구간으로 볼 수 있습니다.</p>
+      </section>
+
+      <section class="indicator-table-panel spread-table-panel">
+        <div class="panel-title">
+          <h3>데이터 표</h3>
+          <span>{{ yieldSpreadRows.length }}개 항목</span>
+        </div>
+        <div class="indicator-table-wrap">
+          <table class="indicator-data-table spread-data-table">
+            <thead>
+              <tr>
+                <th>구분</th>
+                <th>장단기 금리차</th>
+                <th>상태</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in yieldSpreadRows" :key="`${row.country}-spread-table`">
+                <th scope="row">
+                  <span class="country-chip" :class="row.tone">{{ row.country }}</span>
+                </th>
+                <td>
+                  <strong class="rate-cell spread-rate-cell" :class="{ negative: row.spread < 0 }">{{ row.value }}</strong>
+                </td>
+                <td>
+                  <span class="spread-state-pill" :class="{ negative: row.spread < 0, flat: isFlatSpread(row.spread) }">
+                    {{ row.state }}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="spread-summary-grid" aria-label="장단기 금리차 요약">
+        <article v-for="row in yieldSpreadRows" :key="`${row.country}-spread-summary`" :class="row.tone">
+          <span>{{ row.country }}</span>
+          <strong :class="{ negative: row.spread < 0 }">{{ row.value }}</strong>
+          <small>{{ row.state }}</small>
+        </article>
+      </section>
+
+      <section class="indicator-chart-panel spread-chart-panel">
+        <div class="panel-title">
+          <div>
+            <h3>그래프 읽는 법</h3>
+            <p>단위: %p, 가운데 0%p 기준</p>
+          </div>
+          <span>10년 금리 - 3년 금리</span>
+        </div>
+
+        <div class="spread-chart-grid" aria-label="국가별 장단기 금리차 그래프">
+          <article
+            v-for="row in yieldSpreadRows"
+            :key="`${row.country}-spread-chart`"
+            class="spread-chart-card"
+            :class="row.tone"
+          >
+            <header>
+              <strong>{{ row.country }}</strong>
+              <span>{{ row.state }}</span>
+            </header>
+            <div class="spread-value-row">
+              <strong :class="{ negative: row.spread < 0 }">{{ row.value }}</strong>
+            </div>
+            <div class="spread-scale" aria-hidden="true">
+              <span>역전</span>
+              <span>0%p</span>
+              <span>정상</span>
+            </div>
+            <div class="spread-bar-track">
+              <span class="spread-zero-line" aria-hidden="true"></span>
+              <span
+                class="spread-bar"
+                :class="{ negative: row.spread < 0 }"
+                :style="spreadBarStyle(row.spread)"
+              ></span>
+            </div>
+          </article>
+        </div>
+
+        <section class="chart-reading-note spread-reading-note">
+          <h4>데이터 해석</h4>
+          <ul>
+            <li v-for="item in yieldSpreadInterpretation" :key="item">{{ item }}</li>
           </ul>
         </section>
       </section>
@@ -792,6 +999,101 @@ onMounted(async () => {
   font-size: 28px;
   font-weight: 900;
   font-variant-numeric: tabular-nums;
+}
+
+.rate-spread-summary-panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  box-shadow: var(--shadow);
+}
+
+.rate-spread-summary-panel .panel-title {
+  align-items: center;
+}
+
+.rate-spread-summary-panel .panel-title button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 12px;
+  color: var(--primary-dark);
+  background: #f8fbfd;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.rate-spread-summary-panel .panel-title button:hover {
+  border-color: var(--primary);
+  color: white;
+  background: var(--primary);
+}
+
+.rate-spread-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.rate-spread-summary-grid article {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid #dce7ef;
+  border-radius: 8px;
+  background: #fbfdff;
+}
+
+.rate-spread-summary-grid article.us {
+  border-left: 4px solid #1f6f78;
+}
+
+.rate-spread-summary-grid article.jp {
+  border-left: 4px solid #d98c31;
+}
+
+.rate-spread-summary-grid article.kr {
+  border-left: 4px solid #127c57;
+}
+
+.rate-spread-summary-grid span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.rate-spread-summary-grid strong {
+  color: var(--primary-dark);
+  font-size: 18px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.rate-spread-summary-grid strong.negative {
+  color: #b45309;
+}
+
+.rate-spread-summary-grid small {
+  justify-self: end;
+  border-radius: 999px;
+  padding: 5px 9px;
+  color: #0f6f52;
+  background: #e5f5ef;
+  font-size: 11px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.rate-spread-summary-grid small.negative {
+  color: #a15c12;
+  background: #fff1dc;
 }
 
 .indicator-detail-header {
@@ -1288,6 +1590,211 @@ onMounted(async () => {
   margin-top: 0;
 }
 
+.spread-detail-card {
+  gap: 16px;
+}
+
+.spread-table-panel,
+.spread-chart-panel {
+  width: 100%;
+}
+
+.spread-data-table {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.spread-data-table th,
+.spread-data-table td {
+  padding: 18px 20px;
+  vertical-align: middle;
+}
+
+.spread-data-table thead th {
+  background: #eef5f8;
+  color: var(--primary-dark);
+}
+
+.spread-data-table tbody tr:nth-child(even) {
+  background: #fbfdff;
+}
+
+.spread-rate-cell.negative,
+.spread-summary-grid strong.negative,
+.spread-value-row strong.negative {
+  color: #b45309;
+}
+
+.spread-state-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 86px;
+  border-radius: 999px;
+  padding: 7px 12px;
+  color: #0f6f52;
+  background: #e5f5ef;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.spread-state-pill.flat {
+  color: #1f6f78;
+  background: #e8f2f6;
+}
+
+.spread-state-pill.negative {
+  color: #a15c12;
+  background: #fff1dc;
+}
+
+.spread-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.spread-summary-grid article {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdff;
+}
+
+.spread-summary-grid article.us {
+  border-top: 4px solid #1f6f78;
+}
+
+.spread-summary-grid article.jp {
+  border-top: 4px solid #d98c31;
+}
+
+.spread-summary-grid article.kr {
+  border-top: 4px solid #127c57;
+}
+
+.spread-summary-grid span,
+.spread-summary-grid small {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.spread-summary-grid strong {
+  color: var(--primary-dark);
+  font-size: 28px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.spread-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.spread-chart-card {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdff;
+}
+
+.spread-chart-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.spread-chart-card header strong {
+  color: var(--primary-dark);
+  font-size: 16px;
+}
+
+.spread-chart-card header span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.spread-value-row {
+  color: var(--primary-dark);
+  font-size: 22px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.spread-scale {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.spread-scale span:nth-child(2) {
+  text-align: center;
+}
+
+.spread-scale span:nth-child(3) {
+  text-align: right;
+}
+
+.spread-bar-track {
+  position: relative;
+  height: 34px;
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, #fff7ed 0 50%, #e5f5ef 50% 100%);
+  box-shadow: inset 0 0 0 1px #d7e3ee;
+}
+
+.spread-zero-line {
+  position: absolute;
+  top: -7px;
+  bottom: -7px;
+  left: 50%;
+  width: 2px;
+  border-radius: 999px;
+  background: #8fa5b8;
+}
+
+.spread-bar {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  min-width: 6px;
+  border-radius: 999px;
+  background: #127c57;
+}
+
+.spread-bar.negative {
+  background: #d98c31;
+}
+
+.spread-chart-card.us .spread-bar {
+  background: #1f6f78;
+}
+
+.spread-chart-card.jp .spread-bar {
+  background: #d98c31;
+}
+
+.spread-chart-card.kr .spread-bar {
+  background: #127c57;
+}
+
+.spread-reading-note {
+  margin-top: 0;
+}
+
 .indicator-stat-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1319,7 +1826,10 @@ onMounted(async () => {
   .indicator-data-layout,
   .credit-guide-grid,
   .treasury-chart-grid,
-  .base-rate-summary-grid {
+  .base-rate-summary-grid,
+  .rate-spread-summary-grid,
+  .spread-summary-grid,
+  .spread-chart-grid {
     grid-template-columns: 1fr;
   }
 
