@@ -47,55 +47,49 @@ const homeIndicatorCards = computed(() => {
   const credit = indicators.value.find((indicator) => indicator.id === 'credit-rating-yield')
   const deposit = indicators.value.find((indicator) => indicator.id === 'deposit-compare')
   const spread = indicators.value.find((indicator) => indicator.id === 'yield-spread')
+  const centralBank = indicators.value.find((indicator) => indicator.id === 'central-bank-rate')
 
   return [
     {
       ...treasury,
-      title: '국고채 / 미국채 금리',
+      title: '국채 3년·10년 금리',
       variant: 'table',
-      rows: [
-        ['10년', '3.42%'],
-        ['5년', '3.18%'],
-      ],
+      rows: (treasury?.treasuryRates || []).map((row) => [
+        `${row.country} 3Y / 10Y`,
+        `${formatRate(row.rate3y)} / ${formatRate(row.rate10y)}`,
+      ]),
+      caption: '한국·미국·일본 국채 비교',
     },
     {
-      id: 'treasury-rate',
+      ...centralBank,
       title: '국가별 기준 금리',
       caption: '주요국 통화정책 비교',
       variant: 'table',
-      rows: [
-        ['미국', '4.50%'],
-        ['한국', '3.50%'],
-        ['일본', '0.50%'],
-      ],
+      rows: (centralBank?.tableRows || []).slice(0, 3).map((row) => [row[0], row[1]]),
     },
     {
       ...credit,
       title: '신용등급별 평균 금리',
       variant: 'table',
-      rows: [
-        ['AAA', '3.74%'],
-        ['AA', '4.12%'],
-        ['A', '4.86%'],
-      ],
+      rows: (credit?.tableRows || []).slice(0, 3).map((row) => [row[0], row[1]]),
     },
     {
       ...deposit,
       title: '예금 금리 비교',
       variant: 'table',
-      rows: [
-        ['정기예금', '3.10%'],
-        ['우량채', '3.82%'],
-        ['고수익채', '5.40%'],
-      ],
+      rows: (deposit?.tableRows || []).slice(0, 3).map((row) => [row[0], row[3] || row[2]]),
     },
     {
       ...spread,
       title: '장단기 금리차',
       variant: 'chart',
     },
-  ].filter(Boolean)
+].filter(Boolean)
 })
+
+function formatRate(value) {
+  return Number.isFinite(value) ? `${value.toFixed(2)}%` : '-'
+}
 
 const curatedBonds = computed(() => {
   if (!props.isLoggedIn) {
@@ -396,6 +390,10 @@ onMounted(async () => {
   scroll-snap-align: start;
 }
 
+.home-indicator-carousel .metric-card:first-child {
+  flex-basis: 310px;
+}
+
 .home-indicator-carousel .metric-card:last-child {
   flex-basis: 230px;
 }
@@ -416,7 +414,7 @@ onMounted(async () => {
 }
 
 .mini-rate-table th {
-  width: 48%;
+  width: 52%;
   color: var(--text);
   background: #f8fafc;
   font-weight: 800;
@@ -426,6 +424,7 @@ onMounted(async () => {
   color: var(--primary-dark);
   text-align: right;
   font-weight: 900;
+  white-space: nowrap;
 }
 
 .home-hero {

@@ -108,6 +108,11 @@ function normalizeIndicator(summary, rows) {
 }
 
 function normalizeTreasuryRate(base, rows) {
+  const treasuryRates = rows.map((row) => ({
+    country: normalizeCountry(row.country),
+    rate3y: toNumberOrNull(row.three_year_yield),
+    rate10y: toNumberOrNull(row.ten_year_yield),
+  }))
   const tableRows = rows.map((row) => [
     normalizeCountry(row.country),
     formatPercent(row.three_year_yield),
@@ -122,6 +127,7 @@ function normalizeTreasuryRate(base, rows) {
     caption: '10년물 기준',
     chartType: 'line',
     chartPoints: linePoints(rows.map((row) => row.ten_year_yield)),
+    treasuryRates,
     tableColumns: ['구분', '3년 금리', '10년 금리', '해석'],
     tableRows,
     stats: rows.map((row) => ({ label: `${normalizeCountry(row.country)} 10년`, value: formatPercent(row.ten_year_yield) })),
@@ -260,6 +266,11 @@ function formatPercentPoint(value) {
 function normalizeCountry(value) {
   if (!value) return '-'
   return String(value)
+}
+
+function toNumberOrNull(value) {
+  const number = Number(value)
+  return Number.isFinite(number) ? number : null
 }
 
 function barHeights(values) {

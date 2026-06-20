@@ -60,8 +60,56 @@ const barRows = computed(() => {
     label: row[0],
     value: row[1],
     height: bars[index] || 42,
+    description: row[row.length - 1],
   }))
 })
+
+const chartGuide = computed(() => activeIndicator.value?.chartGuide ?? {
+  title: '그래프 읽는 법',
+  unit: '단위: %',
+  xAxis: '가로축은 비교 대상 또는 시간 흐름입니다.',
+  yAxis: '세로축은 수치의 상대적인 크기를 나타냅니다.',
+  reading: '표의 수치를 그래프로 시각화한 참고 자료입니다.',
+  caution: '그래프는 단일 지표이므로 다른 조건과 함께 해석해야 합니다.',
+})
+
+const treasuryRateRows = computed(() => {
+  const rows = activeIndicator.value?.treasuryRates || []
+
+  return rows.map((row) => ({
+    ...row,
+    interpretation: '3년물 / 10년물 금리',
+    spread: Number.isFinite(row.rate10y) && Number.isFinite(row.rate3y) ? row.rate10y - row.rate3y : null,
+    tone: getCountryTone(row.country),
+  }))
+})
+
+const treasuryAxisTicks = [10, 5, 0]
+const treasuryTerms = [
+  { key: 'rate3y', label: '3년 금리' },
+  { key: 'rate10y', label: '10년 금리' },
+]
+
+function formatRate(value) {
+  return Number.isFinite(value) ? `${value.toFixed(2)}%` : '-'
+}
+
+function formatRateGap(value) {
+  if (!Number.isFinite(value)) return '-'
+  const sign = value > 0 ? '+' : ''
+  return `${sign}${value.toFixed(2)}%p`
+}
+
+function treasuryBarHeight(rate) {
+  return Number.isFinite(rate) ? `${Math.max(4, (rate / 10) * 100)}%` : '4%'
+}
+
+function getCountryTone(country) {
+  if (country.includes('미국')) return 'us'
+  if (country.includes('일본')) return 'jp'
+  if (country.includes('한국') || country.includes('대한민국')) return 'kr'
+  return 'default'
+}
 
 onMounted(async () => {
   indicators.value = await fetchIndicators()
@@ -88,7 +136,132 @@ onMounted(async () => {
       </button>
     </div>
 
-    <article v-if="activeIndicator && activeIndicator.id === 'credit-rating-yield'" class="credit-rate-board">
+    <article v-if="activeIndicator && activeIndicator.id === 'treasury-rate'" class="indicator-detail-card treasury-detail-card">
+      <header class="indicator-detail-header">
+        <div>
+          <p class="eyebrow">Indicator Report</p>
+          <h2>{{ activeIndicator.title }}</h2>
+        </div>
+        <div class="indicator-current-value">
+          <span>현재 기준</span>
+          <strong>{{ activeIndicator.value }}</strong>
+          <small>{{ activeIndicator.caption }}</small>
+        </div>
+      </header>
+
+      <section class="indicator-explanation">
+        <h3>개념 설명</h3>
+        <p>국고채와 미국채 금리를 비교해 시장이 반영하는 장단기 금리 수준을 확인합니다.</p>
+      </section>
+
+      <section class="indicator-table-panel treasury-table-panel">
+        <div class="panel-title">
+          <h3>데이터 표</h3>
+          <span>{{ treasuryRateRows.length }}개 항목</span>
+        </div>
+        <div class="indicator-table-wrap">
+          <table class="indicator-data-table treasury-rate-table">
+            <thead>
+              <tr>
+                <th>구분</th>
+                <th>3년 금리</th>
+                <th>10년 금리</th>
+                <th>10년-3년</th>
+                <th>해석</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in treasuryRateRows" :key="row.country">
+                <th scope="row">
+                  <span class="country-chip" :class="row.tone">{{ row.country }}</span>
+                </th>
+                <td>
+                  <strong class="rate-cell">{{ formatRate(row.rate3y) }}</strong>
+                  <small>3년물</small>
+                </td>
+                <td>
+                  <strong class="rate-cell">{{ formatRate(row.rate10y) }}</strong>
+                  <small>10년물</small>
+                </td>
+                <td>
+                  <strong class="rate-gap" :class="{ positive: row.spread > 0, negative: row.spread < 0 }">
+                    {{ formatRateGap(row.spread) }}
+                  </strong>
+                  <small>장단기 차이</small>
+                </td>
+                <td>
+                  <span class="table-note">{{ row.interpretation }}</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="indicator-chart-panel treasury-chart-panel">
+        <div class="panel-title">
+          <div>
+            <h3>그래프 읽는 법</h3>
+            <p>단위: %, 세로축 0~10%</p>
+          </div>
+          <span>3년·10년 금리 비교</span>
+        </div>
+
+        <section class="chart-guide treasury-guide" aria-label="국채 금리 그래프 해석 안내">
+          <div>
+            <strong>가로축</strong>
+            <p>왼쪽은 3년 금리, 오른쪽은 10년 금리입니다.</p>
+          </div>
+          <div>
+            <strong>세로축</strong>
+            <p>0%부터 10%까지의 금리 수준입니다.</p>
+          </div>
+        </section>
+
+        <div class="treasury-chart-grid" aria-label="한국 미국 일본 3년 10년 금리 그래프">
+          <article
+            v-for="row in treasuryRateRows"
+            :key="`${row.country}-chart`"
+            class="treasury-chart-card"
+            :class="row.tone"
+          >
+            <header>
+              <strong>{{ row.country }}</strong>
+              <span>3년 {{ formatRate(row.rate3y) }} · 10년 {{ formatRate(row.rate10y) }}</span>
+            </header>
+
+            <div class="treasury-bar-chart" :aria-label="`${row.country} 3년 10년 금리 막대 그래프`">
+              <div class="treasury-axis" aria-hidden="true">
+                <span v-for="tick in treasuryAxisTicks" :key="tick">{{ tick }}%</span>
+              </div>
+              <div class="treasury-bar-plot">
+                <div class="treasury-grid-lines" aria-hidden="true">
+                  <span v-for="tick in treasuryAxisTicks" :key="`${row.country}-${tick}`"></span>
+                </div>
+                <div
+                  v-for="term in treasuryTerms"
+                  :key="`${row.country}-${term.key}`"
+                  class="treasury-bar-item"
+                >
+                  <strong>{{ formatRate(row[term.key]) }}</strong>
+                  <span :style="{ height: treasuryBarHeight(row[term.key]) }"></span>
+                  <small>{{ term.label }}</small>
+                </div>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <section class="chart-reading-note treasury-reading-note">
+          <h4>이 그래프는 이렇게 봅니다</h4>
+          <p>{{ chartGuide.reading }}</p>
+          <h4>주의해서 볼 점</h4>
+          <p>{{ chartGuide.caution }}</p>
+        </section>
+      </section>
+    </article>
+
+    <article v-else-if="activeIndicator && activeIndicator.id === 'credit-rating-yield'" class="credit-rate-board">
       <header class="credit-board-header">
         <div>
           <p class="eyebrow">Credit Rating Rates</p>
@@ -121,6 +294,21 @@ onMounted(async () => {
           등급별 스프레드
         </button>
       </div>
+
+      <section class="credit-guide-grid" aria-label="신용등급 지표 해석 안내">
+        <article>
+          <strong>등급별 금리</strong>
+          <p>같은 기준일에서 신용등급별 회사채 평균 금리를 비교합니다. 등급이 낮을수록 시장이 요구하는 위험 보상이 커질 수 있습니다.</p>
+        </article>
+        <article>
+          <strong>등급별 스프레드</strong>
+          <p>국고채 금리 대비 추가 수익률입니다. 스프레드가 커질수록 신용위험 프리미엄이 확대된 것으로 해석할 수 있습니다.</p>
+        </article>
+        <article>
+          <strong>주의해서 볼 점</strong>
+          <p>높은 금리는 높은 보상인 동시에 신용위험, 유동성위험, 등급 하락 가능성이 반영된 결과일 수 있습니다.</p>
+        </article>
+      </section>
 
       <div class="credit-table-wrap">
         <table class="credit-rate-table">
@@ -191,37 +379,80 @@ onMounted(async () => {
 
         <div class="indicator-chart-panel">
           <div class="panel-title">
-            <h3>그래프</h3>
-            <span>{{ activeIndicator.chartType }}</span>
+            <div>
+              <h3>{{ chartGuide.title }}</h3>
+              <p>{{ chartGuide.unit }}</p>
+            </div>
+            <span>{{ activeIndicator.chartType === 'bar' ? '막대 비교' : '흐름 비교' }}</span>
           </div>
 
-          <svg
-            v-if="activeIndicator.chartType === 'line' || activeIndicator.chartType === 'curve'"
-            viewBox="0 0 720 240"
-            class="indicator-chart line-chart"
-            aria-label="금리 추이 그래프"
-          >
-            <line x1="20" y1="190" x2="700" y2="190" />
-            <line x1="20" y1="40" x2="20" y2="190" />
-            <line x1="20" y1="140" x2="700" y2="140" />
-            <line x1="20" y1="90" x2="700" y2="90" />
-            <polyline :points="activeIndicator.chartPoints" />
-            <circle
-              v-for="point in activeIndicator.chartPoints.split(' ')"
-              :key="point"
-              :cx="point.split(',')[0]"
-              :cy="point.split(',')[1]"
-              r="5"
-            />
-          </svg>
+          <section class="chart-guide" aria-label="그래프 해석 안내">
+            <div>
+              <strong>가로축</strong>
+              <p>{{ chartGuide.xAxis }}</p>
+            </div>
+            <div>
+              <strong>세로축</strong>
+              <p>{{ chartGuide.yAxis }}</p>
+            </div>
+          </section>
 
-          <div v-else class="indicator-chart bar-chart" aria-label="금리 비교 막대 그래프">
-            <div v-for="row in barRows" :key="row.label" class="bar-item">
-              <span :style="{ height: `${row.height}%` }"></span>
-              <strong>{{ row.value }}</strong>
-              <small>{{ row.label }}</small>
+          <div class="chart-frame">
+            <div class="chart-y-axis" aria-hidden="true">
+              <span>높음</span>
+              <span>낮음</span>
+            </div>
+
+            <svg
+              v-if="activeIndicator.chartType === 'line' || activeIndicator.chartType === 'curve'"
+              viewBox="0 0 720 260"
+              class="indicator-chart line-chart"
+              :aria-label="`${activeIndicator.title} 흐름 그래프`"
+            >
+              <text x="20" y="26" class="axis-label">높음</text>
+              <text x="20" y="238" class="axis-label">낮음</text>
+              <line x1="20" y1="205" x2="700" y2="205" />
+              <line x1="20" y1="44" x2="20" y2="205" />
+              <line x1="20" y1="155" x2="700" y2="155" />
+              <line x1="20" y1="100" x2="700" y2="100" />
+              <polyline :points="activeIndicator.chartPoints" />
+              <circle
+                v-for="point in activeIndicator.chartPoints.split(' ')"
+                :key="point"
+                :cx="point.split(',')[0]"
+                :cy="point.split(',')[1]"
+                r="5"
+              />
+              <text x="20" y="246" class="axis-label">
+                {{ activeIndicator.chartType === 'curve' ? '짧은 만기' : '과거' }}
+              </text>
+              <text x="620" y="246" class="axis-label">
+                {{ activeIndicator.chartType === 'curve' ? '긴 만기' : '최근' }}
+              </text>
+            </svg>
+
+            <div v-else class="indicator-chart bar-chart" :aria-label="`${activeIndicator.title} 막대 그래프`">
+              <div v-for="row in barRows" :key="row.label" class="bar-item">
+                <span :style="{ height: `${row.height}%` }"></span>
+                <strong>{{ row.value }}</strong>
+                <small>{{ row.label }}</small>
+              </div>
             </div>
           </div>
+
+          <div v-if="activeIndicator.chartType === 'bar'" class="bar-legend">
+            <article v-for="row in barRows" :key="`${row.label}-legend`">
+              <strong>{{ row.label }} {{ row.value }}</strong>
+              <p>{{ row.description }}</p>
+            </article>
+          </div>
+
+          <section class="chart-reading-note">
+            <h4>이 그래프는 이렇게 봅니다</h4>
+            <p>{{ chartGuide.reading }}</p>
+            <h4>주의해서 볼 점</h4>
+            <p>{{ chartGuide.caution }}</p>
+          </section>
         </div>
       </section>
 
@@ -272,6 +503,31 @@ onMounted(async () => {
 .credit-rate-board {
   display: grid;
   gap: 20px;
+}
+
+.credit-guide-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.credit-guide-grid article {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+}
+
+.credit-guide-grid strong {
+  color: var(--primary-dark);
+  font-size: 14px;
+}
+
+.credit-guide-grid p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .credit-board-header h2 {
@@ -414,6 +670,29 @@ onMounted(async () => {
   box-shadow: var(--shadow);
 }
 
+.treasury-detail-card {
+  background: transparent;
+  box-shadow: none;
+}
+
+.treasury-table-panel,
+.treasury-chart-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  box-shadow: var(--shadow);
+}
+
+.treasury-table-panel {
+  padding: 18px;
+}
+
+.treasury-chart-panel {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+}
+
 .indicator-detail-header {
   display: flex;
   justify-content: space-between;
@@ -496,6 +775,72 @@ onMounted(async () => {
   margin-bottom: 12px;
 }
 
+.panel-title p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.chart-guide {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.treasury-guide {
+  margin-bottom: 0;
+}
+
+.chart-guide div,
+.chart-reading-note,
+.bar-legend article {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.chart-guide div {
+  padding: 12px;
+}
+
+.chart-guide strong,
+.chart-reading-note h4,
+.bar-legend strong {
+  color: var(--primary-dark);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.chart-guide p,
+.chart-reading-note p,
+.bar-legend p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.chart-frame {
+  position: relative;
+}
+
+.chart-y-axis {
+  position: absolute;
+  z-index: 1;
+  top: 16px;
+  bottom: 18px;
+  left: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  pointer-events: none;
+}
+
 .indicator-table-wrap {
   overflow-x: visible;
 }
@@ -526,12 +871,103 @@ onMounted(async () => {
   font-size: 14px;
 }
 
+.treasury-rate-table {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.treasury-rate-table th,
+.treasury-rate-table td {
+  padding: 16px 18px;
+  vertical-align: middle;
+}
+
+.treasury-rate-table thead th {
+  background: #eef5f8;
+  color: var(--primary-dark);
+  font-size: 13px;
+}
+
+.treasury-rate-table tbody tr:nth-child(even) {
+  background: #fbfdff;
+}
+
+.treasury-rate-table tbody tr:hover {
+  background: #f3faf9;
+}
+
+.country-chip {
+  display: inline-flex;
+  min-width: 54px;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: white;
+  background: var(--primary);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.country-chip.us {
+  background: #1f6f78;
+}
+
+.country-chip.jp {
+  background: #d98c31;
+}
+
+.country-chip.kr {
+  background: #127c57;
+}
+
+.rate-cell,
+.rate-gap {
+  display: block;
+  color: var(--primary-dark);
+  font-size: 18px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.rate-gap.positive {
+  color: #127c57;
+}
+
+.rate-gap.negative {
+  color: #c2410c;
+}
+
+.treasury-rate-table small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.table-note {
+  display: inline-flex;
+  border-radius: 6px;
+  padding: 6px 9px;
+  color: var(--muted);
+  background: var(--surface-soft);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .indicator-chart {
   width: 100%;
   min-height: 260px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fbfdff;
+}
+
+.axis-label {
+  fill: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .line-chart line {
@@ -558,7 +994,7 @@ onMounted(async () => {
   align-items: end;
   justify-content: space-around;
   gap: 16px;
-  padding: 24px 18px 18px;
+  padding: 30px 18px 18px 44px;
 }
 
 .bar-item {
@@ -586,6 +1022,157 @@ onMounted(async () => {
 .bar-item small {
   color: var(--muted);
   font-weight: 800;
+}
+
+.bar-legend {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.bar-legend article {
+  padding: 12px;
+}
+
+.chart-reading-note {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 14px;
+  background: white;
+}
+
+.chart-reading-note h4,
+.chart-reading-note p {
+  margin: 0;
+}
+
+.treasury-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.treasury-chart-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdff;
+}
+
+.treasury-chart-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+
+.treasury-chart-card header strong {
+  color: var(--primary-dark);
+  font-size: 16px;
+}
+
+.treasury-chart-card header span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: right;
+}
+
+.treasury-bar-chart {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 10px;
+  min-height: 238px;
+}
+
+.treasury-axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 18px 0 34px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  text-align: right;
+}
+
+.treasury-bar-plot {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px;
+  align-items: end;
+  min-height: 220px;
+  padding: 18px 18px 0;
+  border-left: 2px solid #9fb2c3;
+  border-bottom: 2px solid #9fb2c3;
+}
+
+.treasury-grid-lines {
+  position: absolute;
+  inset: 18px 0 34px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.treasury-grid-lines span {
+  display: block;
+  width: 100%;
+  border-top: 1px solid #d9e4ee;
+}
+
+.treasury-bar-item {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 8px;
+  align-items: end;
+  height: 200px;
+  text-align: center;
+}
+
+.treasury-bar-item strong {
+  color: var(--primary-dark);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.treasury-bar-item > span {
+  width: min(58px, 76%);
+  min-height: 6px;
+  border-radius: 6px 6px 0 0;
+  justify-self: center;
+  background: var(--primary);
+}
+
+.treasury-chart-card.us .treasury-bar-item > span {
+  background: #1f6f78;
+}
+
+.treasury-chart-card.jp .treasury-bar-item > span {
+  background: #d98c31;
+}
+
+.treasury-chart-card.kr .treasury-bar-item > span {
+  background: #127c57;
+}
+
+.treasury-bar-item small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.treasury-reading-note {
+  margin-top: 0;
 }
 
 .indicator-stat-grid {
@@ -616,7 +1203,9 @@ onMounted(async () => {
 
 @media (max-width: 960px) {
   .indicator-detail-header,
-  .indicator-data-layout {
+  .indicator-data-layout,
+  .credit-guide-grid,
+  .treasury-chart-grid {
     grid-template-columns: 1fr;
   }
 
@@ -633,6 +1222,11 @@ onMounted(async () => {
 @media (max-width: 640px) {
   .indicator-detail-card {
     padding: 18px;
+  }
+
+  .chart-guide,
+  .bar-legend {
+    grid-template-columns: 1fr;
   }
 
   .indicator-stat-grid {
