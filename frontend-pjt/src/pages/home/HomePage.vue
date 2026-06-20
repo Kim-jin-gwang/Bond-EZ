@@ -48,24 +48,20 @@ const homeIndicatorCards = computed(() => {
   const deposit = indicators.value.find((indicator) => indicator.id === 'deposit-compare')
   const spread = indicators.value.find((indicator) => indicator.id === 'yield-spread')
   const centralBank = indicators.value.find((indicator) => indicator.id === 'central-bank-rate')
+  const centralRateByCountry = Object.fromEntries(
+    (centralBank?.tableRows || []).map((row) => [row[0], row[1]]),
+  )
 
   return [
     {
       ...treasury,
-      title: '국채 3년·10년 금리',
+      title: '국채·기준금리',
       variant: 'table',
       rows: (treasury?.treasuryRates || []).map((row) => [
-        `${row.country} 3Y / 10Y`,
-        `${formatRate(row.rate3y)} / ${formatRate(row.rate10y)}`,
+        row.country,
+        `${centralRateByCountry[row.country] || '-'} / ${formatRate(row.rate3y)} / ${formatRate(row.rate10y)}`,
       ]),
-      caption: '한국·미국·일본 국채 비교',
-    },
-    {
-      ...centralBank,
-      title: '국가별 기준 금리',
-      caption: '주요국 통화정책 비교',
-      variant: 'table',
-      rows: (centralBank?.tableRows || []).slice(0, 3).map((row) => [row[0], row[1]]),
+      caption: '기준금리 / 3Y / 10Y',
     },
     {
       ...credit,

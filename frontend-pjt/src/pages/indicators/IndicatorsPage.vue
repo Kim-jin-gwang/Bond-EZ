@@ -17,6 +17,15 @@ const activeIndicator = computed(() => {
   return indicators.value.find((indicator) => indicator.id === props.selectedIndicatorId) ?? indicators.value[0]
 })
 
+const visibleIndicators = computed(() =>
+  indicators.value.filter((indicator) => indicator.id !== 'central-bank-rate'),
+)
+const treasuryIndicator = computed(() => indicators.value.find((indicator) => indicator.id === 'treasury-rate'))
+const centralBankIndicator = computed(() => indicators.value.find((indicator) => indicator.id === 'central-bank-rate'))
+const isRateDashboard = computed(() =>
+  activeIndicator.value?.id === 'treasury-rate' || activeIndicator.value?.id === 'central-bank-rate',
+)
+
 const creditRateView = ref('rates')
 const creditBaseDate = ref('2024-10-16')
 
@@ -73,15 +82,70 @@ const chartGuide = computed(() => activeIndicator.value?.chartGuide ?? {
   caution: '그래프는 단일 지표이므로 다른 조건과 함께 해석해야 합니다.',
 })
 
-const treasuryRateRows = computed(() => {
-  const rows = activeIndicator.value?.treasuryRates || []
-
-  return rows.map((row) => ({
-    ...row,
-    interpretation: '3년물 / 10년물 금리',
-    spread: Number.isFinite(row.rate10y) && Number.isFinite(row.rate3y) ? row.rate10y - row.rate3y : null,
-    tone: getCountryTone(row.country),
+const rateDashboardRows = computed(() => {
+  const treasuryRows = treasuryIndicator.value?.treasuryRates || []
+  const centralRows = (centralBankIndicator.value?.tableRows || []).map((row) => ({
+    country: row[0],
+    baseRate: parseRate(row[1]),
+    rate3y: parseRate(row[2]),
+    rate10y: parseRate(row[3]),
   }))
+  const countries = [...new Set([
+    ...treasuryRows.map((row) => row.country),
+    ...centralRows.map((row) => row.country),
+  ])]
+
+  return countries.map((country) => {
+    const treasury = treasuryRows.find((row) => row.country === country) || {}
+    const central = centralRows.find((row) => row.country === country) || {}
+    const rate3y = treasury.rate3y ?? central.rate3y
+    const rate10y = treasury.rate10y ?? central.rate10y
+
+    return {
+      country,
+      baseRate: central.baseRate,
+      rate3y,
+      rate10y,
+      tone: getCountryTone(country),
+    }
+  })
+})
+
+const baseRateSummaryCards = computed(() =>
+  rateDashboardRows.value.map((row) => ({
+    country: row.country,
+    value: formatRate(row.baseRate),
+    caption: `3년 ${formatRate(row.rate3y)} · 10년 ${formatRate(row.rate10y)}`,
+    tone: row.tone,
+  })),
+)
+
+const rateDashboardInterpretation = computed(() => {
+  const rows = rateDashboardRows.value
+  const korea = rows.find((row) => row.country.includes('한국') || row.country.includes('대한민국'))
+  const us = rows.find((row) => row.country.includes('미국'))
+  const japan = rows.find((row) => row.country.includes('일본'))
+  const highestBaseRate = rows
+    .filter((row) => Number.isFinite(row.baseRate))
+    .sort((a, b) => b.baseRate - a.baseRate)[0]
+
+  return [
+    highestBaseRate
+      ? `${highestBaseRate.country}의 기준금리가 가장 높아 통화정책이 상대적으로 긴축적인 상태로 보입니다.`
+      : '기준금리 데이터가 충분하지 않아 국가 간 통화정책 강도를 비교하기 어렵습니다.',
+    korea && us && Number.isFinite(korea.rate10y) && Number.isFinite(us.rate10y)
+      ? `한국 10년 금리는 미국 10년 금리보다 ${Math.abs(us.rate10y - korea.rate10y).toFixed(2)}%p 낮아, 장기 금리 수준은 미국이 더 높게 형성되어 있습니다.`
+      : '한국과 미국의 10년 금리 비교 데이터가 충분하지 않습니다.',
+    japan && Number.isFinite(japan.baseRate) && Number.isFinite(japan.rate10y)
+      ? '일본은 기준금리와 장기금리 모두 낮은 편이라, 다른 국가보다 완화적인 금리 환경으로 볼 수 있습니다.'
+      : '일본 금리 데이터가 충분하지 않습니다.',
+    '이 화면은 국가별 금리 수준을 비교하는 용도이며, 장단기 금리차 해석은 별도의 장단기 금리차 페이지에서 확인하는 것이 좋습니다.',
+  ]
+})
+
+const rateDashboardValue = computed(() => {
+  const korea = rateDashboardRows.value.find((row) => row.country.includes('한국') || row.country.includes('대한민국'))
+  return formatRate(korea?.rate10y ?? rateDashboardRows.value[0]?.rate10y)
 })
 
 const treasuryAxisTicks = [10, 5, 0]
@@ -94,10 +158,9 @@ function formatRate(value) {
   return Number.isFinite(value) ? `${value.toFixed(2)}%` : '-'
 }
 
-function formatRateGap(value) {
-  if (!Number.isFinite(value)) return '-'
-  const sign = value > 0 ? '+' : ''
-  return `${sign}${value.toFixed(2)}%p`
+function parseRate(value) {
+  const number = Number(String(value ?? '').replace(/[^0-9.-]/g, ''))
+  return Number.isFinite(number) ? number : null
 }
 
 function treasuryBarHeight(rate) {
@@ -126,7 +189,7 @@ onMounted(async () => {
 
     <div class="indicator-nav" aria-label="투자 지표 선택">
       <button
-        v-for="indicator in indicators"
+        v-for="indicator in visibleIndicators"
         :key="indicator.id"
         :class="{ active: activeIndicator.id === indicator.id }"
         type="button"
@@ -136,66 +199,65 @@ onMounted(async () => {
       </button>
     </div>
 
-    <article v-if="activeIndicator && activeIndicator.id === 'treasury-rate'" class="indicator-detail-card treasury-detail-card">
+    <article v-if="activeIndicator && isRateDashboard" class="indicator-detail-card treasury-detail-card">
       <header class="indicator-detail-header">
         <div>
           <p class="eyebrow">Indicator Report</p>
-          <h2>{{ activeIndicator.title }}</h2>
+          <h2>국채·미국채 금리와 기준금리</h2>
         </div>
         <div class="indicator-current-value">
-          <span>현재 기준</span>
-          <strong>{{ activeIndicator.value }}</strong>
-          <small>{{ activeIndicator.caption }}</small>
+          <span>한국 10년물 기준</span>
+          <strong>{{ rateDashboardValue }}</strong>
+          <small>기준금리와 3년·10년 금리 비교</small>
         </div>
       </header>
 
       <section class="indicator-explanation">
         <h3>개념 설명</h3>
-        <p>국고채와 미국채 금리를 비교해 시장이 반영하는 장단기 금리 수준을 확인합니다.</p>
+        <p>국가별 기준금리와 3년·10년 국채 금리를 함께 비교해 통화정책 수준과 장단기 금리 구조를 확인합니다.</p>
       </section>
 
       <section class="indicator-table-panel treasury-table-panel">
         <div class="panel-title">
           <h3>데이터 표</h3>
-          <span>{{ treasuryRateRows.length }}개 항목</span>
+          <span>{{ rateDashboardRows.length }}개 항목</span>
         </div>
         <div class="indicator-table-wrap">
           <table class="indicator-data-table treasury-rate-table">
             <thead>
               <tr>
                 <th>구분</th>
+                <th>기준금리</th>
                 <th>3년 금리</th>
                 <th>10년 금리</th>
-                <th>10년-3년</th>
-                <th>해석</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="row in treasuryRateRows" :key="row.country">
+              <tr v-for="row in rateDashboardRows" :key="row.country">
                 <th scope="row">
                   <span class="country-chip" :class="row.tone">{{ row.country }}</span>
                 </th>
                 <td>
+                  <strong class="rate-cell">{{ formatRate(row.baseRate) }}</strong>
+                </td>
+                <td>
                   <strong class="rate-cell">{{ formatRate(row.rate3y) }}</strong>
-                  <small>3년물</small>
                 </td>
                 <td>
                   <strong class="rate-cell">{{ formatRate(row.rate10y) }}</strong>
-                  <small>10년물</small>
-                </td>
-                <td>
-                  <strong class="rate-gap" :class="{ positive: row.spread > 0, negative: row.spread < 0 }">
-                    {{ formatRateGap(row.spread) }}
-                  </strong>
-                  <small>장단기 차이</small>
-                </td>
-                <td>
-                  <span class="table-note">{{ row.interpretation }}</span>
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
+      </section>
+
+      <section class="base-rate-summary-grid" aria-label="기준금리 데이터 요약">
+        <article v-for="card in baseRateSummaryCards" :key="`${card.country}-base-rate`" :class="card.tone">
+          <span>{{ card.country }} 기준금리</span>
+          <strong>{{ card.value }}</strong>
+          <small>{{ card.caption }}</small>
+        </article>
       </section>
 
       <section class="indicator-chart-panel treasury-chart-panel">
@@ -204,33 +266,26 @@ onMounted(async () => {
             <h3>그래프 읽는 법</h3>
             <p>단위: %, 세로축 0~10%</p>
           </div>
-          <span>3년·10년 금리 비교</span>
+          <span>기준금리·3년·10년 금리 비교</span>
         </div>
-
-        <section class="chart-guide treasury-guide" aria-label="국채 금리 그래프 해석 안내">
-          <div>
-            <strong>가로축</strong>
-            <p>왼쪽은 3년 금리, 오른쪽은 10년 금리입니다.</p>
-          </div>
-          <div>
-            <strong>세로축</strong>
-            <p>0%부터 10%까지의 금리 수준입니다.</p>
-          </div>
-        </section>
 
         <div class="treasury-chart-grid" aria-label="한국 미국 일본 3년 10년 금리 그래프">
           <article
-            v-for="row in treasuryRateRows"
+            v-for="row in rateDashboardRows"
             :key="`${row.country}-chart`"
             class="treasury-chart-card"
             :class="row.tone"
           >
             <header>
               <strong>{{ row.country }}</strong>
-              <span>3년 {{ formatRate(row.rate3y) }} · 10년 {{ formatRate(row.rate10y) }}</span>
             </header>
 
             <div class="treasury-bar-chart" :aria-label="`${row.country} 3년 10년 금리 막대 그래프`">
+              <div class="treasury-value-row">
+                <span v-for="term in treasuryTerms" :key="`${row.country}-${term.key}-value`">
+                  {{ formatRate(row[term.key]) }}
+                </span>
+              </div>
               <div class="treasury-axis" aria-hidden="true">
                 <span v-for="tick in treasuryAxisTicks" :key="tick">{{ tick }}%</span>
               </div>
@@ -243,20 +298,21 @@ onMounted(async () => {
                   :key="`${row.country}-${term.key}`"
                   class="treasury-bar-item"
                 >
-                  <strong>{{ formatRate(row[term.key]) }}</strong>
                   <span :style="{ height: treasuryBarHeight(row[term.key]) }"></span>
-                  <small>{{ term.label }}</small>
                 </div>
+              </div>
+              <div class="treasury-term-row">
+                <span v-for="term in treasuryTerms" :key="`${row.country}-${term.key}-label`">{{ term.label }}</span>
               </div>
             </div>
           </article>
         </div>
 
         <section class="chart-reading-note treasury-reading-note">
-          <h4>이 그래프는 이렇게 봅니다</h4>
-          <p>{{ chartGuide.reading }}</p>
-          <h4>주의해서 볼 점</h4>
-          <p>{{ chartGuide.caution }}</p>
+          <h4>데이터 해석</h4>
+          <ul>
+            <li v-for="item in rateDashboardInterpretation" :key="item">{{ item }}</li>
+          </ul>
         </section>
       </section>
     </article>
@@ -693,6 +749,49 @@ onMounted(async () => {
   padding: 18px;
 }
 
+.base-rate-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.base-rate-summary-grid article {
+  display: grid;
+  gap: 6px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--primary);
+  border-radius: 8px;
+  background: white;
+  box-shadow: var(--shadow);
+}
+
+.base-rate-summary-grid article.us {
+  border-left-color: #1f6f78;
+}
+
+.base-rate-summary-grid article.jp {
+  border-left-color: #d98c31;
+}
+
+.base-rate-summary-grid article.kr {
+  border-left-color: #127c57;
+}
+
+.base-rate-summary-grid span,
+.base-rate-summary-grid small {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.base-rate-summary-grid strong {
+  color: var(--primary-dark);
+  font-size: 28px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
 .indicator-detail-header {
   display: flex;
   justify-content: space-between;
@@ -789,10 +888,6 @@ onMounted(async () => {
   margin-bottom: 12px;
 }
 
-.treasury-guide {
-  margin-bottom: 0;
-}
-
 .chart-guide div,
 .chart-reading-note,
 .bar-legend article {
@@ -879,7 +974,7 @@ onMounted(async () => {
 
 .treasury-rate-table th,
 .treasury-rate-table td {
-  padding: 16px 18px;
+  padding: 18px 20px;
   vertical-align: middle;
 }
 
@@ -921,21 +1016,12 @@ onMounted(async () => {
   background: #127c57;
 }
 
-.rate-cell,
-.rate-gap {
+.rate-cell {
   display: block;
   color: var(--primary-dark);
-  font-size: 18px;
+  font-size: 22px;
   font-weight: 900;
   font-variant-numeric: tabular-nums;
-}
-
-.rate-gap.positive {
-  color: #127c57;
-}
-
-.rate-gap.negative {
-  color: #c2410c;
 }
 
 .treasury-rate-table small {
@@ -943,16 +1029,6 @@ onMounted(async () => {
   margin-top: 4px;
   color: var(--muted);
   font-size: 11px;
-  font-weight: 800;
-}
-
-.table-note {
-  display: inline-flex;
-  border-radius: 6px;
-  padding: 6px 9px;
-  color: var(--muted);
-  background: var(--surface-soft);
-  font-size: 12px;
   font-weight: 800;
 }
 
@@ -1048,6 +1124,20 @@ onMounted(async () => {
   margin: 0;
 }
 
+.chart-reading-note ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.chart-reading-note li {
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.65;
+  word-break: keep-all;
+}
+
 .treasury-chart-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1086,15 +1176,42 @@ onMounted(async () => {
 .treasury-bar-chart {
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr);
-  gap: 10px;
+  grid-template-rows: auto 180px auto;
+  column-gap: 10px;
+  row-gap: 8px;
   min-height: 238px;
 }
 
+.treasury-value-row,
+.treasury-term-row {
+  grid-column: 2;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px;
+  padding: 0 28px;
+  text-align: center;
+}
+
+.treasury-value-row span {
+  color: var(--primary-dark);
+  font-size: 13px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.treasury-term-row span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
 .treasury-axis {
+  grid-column: 1;
+  grid-row: 2;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 18px 0 34px;
+  height: 180px;
   color: var(--muted);
   font-size: 12px;
   font-weight: 900;
@@ -1102,20 +1219,22 @@ onMounted(async () => {
 }
 
 .treasury-bar-plot {
+  grid-column: 2;
+  grid-row: 2;
   position: relative;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 28px;
   align-items: end;
-  min-height: 220px;
-  padding: 18px 18px 0;
+  height: 180px;
+  padding: 0 28px;
   border-left: 2px solid #9fb2c3;
   border-bottom: 2px solid #9fb2c3;
 }
 
 .treasury-grid-lines {
   position: absolute;
-  inset: 18px 0 34px;
+  inset: 0 0 0;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -1132,17 +1251,9 @@ onMounted(async () => {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: 8px;
   align-items: end;
-  height: 200px;
+  height: 180px;
   text-align: center;
-}
-
-.treasury-bar-item strong {
-  color: var(--primary-dark);
-  font-size: 13px;
-  font-weight: 900;
 }
 
 .treasury-bar-item > span {
@@ -1205,7 +1316,8 @@ onMounted(async () => {
   .indicator-detail-header,
   .indicator-data-layout,
   .credit-guide-grid,
-  .treasury-chart-grid {
+  .treasury-chart-grid,
+  .base-rate-summary-grid {
     grid-template-columns: 1fr;
   }
 
