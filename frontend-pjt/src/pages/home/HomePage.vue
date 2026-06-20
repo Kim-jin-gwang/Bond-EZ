@@ -44,16 +44,16 @@ const homeIndicatorCards = computed(() => {
   }
 
   const treasury = indicators.value.find((indicator) => indicator.id === 'treasury-rate')
+  const spread = indicators.value.find((indicator) => indicator.id === 'yield-spread')
   const credit = indicators.value.find((indicator) => indicator.id === 'credit-rating-yield')
   const deposit = indicators.value.find((indicator) => indicator.id === 'deposit-compare')
-  const spread = indicators.value.find((indicator) => indicator.id === 'yield-spread')
   const centralBank = indicators.value.find((indicator) => indicator.id === 'central-bank-rate')
   const centralRateByCountry = Object.fromEntries(
     (centralBank?.tableRows || []).map((row) => [row[0], row[1]]),
   )
 
   return [
-    {
+    treasury && {
       ...treasury,
       title: '나라별 금리',
       variant: 'table',
@@ -63,28 +63,55 @@ const homeIndicatorCards = computed(() => {
       ]),
       caption: '기준금리 / 3Y / 10Y',
     },
-    {
-      ...credit,
-      title: '신용등급별 평균 금리',
+    spread && {
+      ...spread,
+      title: '장단기 금리차',
       variant: 'table',
-      rows: (credit?.tableRows || []).slice(0, 3).map((row) => [row[0], row[1]]),
+      rows: (spread?.tableRows || []).slice(0, 3).map((row) => [row[0], row[1]]),
+      caption: '10년물 - 3년물',
     },
-    {
+    credit && {
+      ...credit,
+      title: '신용 등급 금리',
+      variant: 'table',
+      rows: buildCreditSummaryRows(credit?.tableRows || [], ['국채', 'AAA', 'BBB']),
+      caption: credit?.caption || '국채 기준',
+    },
+    deposit && {
       ...deposit,
       title: '예금 금리 비교',
       variant: 'table',
-      rows: (deposit?.tableRows || []).slice(0, 3).map((row) => [row[0], row[3] || row[2]]),
-    },
-    {
-      ...spread,
-      title: '장단기 금리차',
-      variant: 'chart',
+      rows: [...(deposit?.tableRows || [])]
+        .sort((a, b) => parsePercent(b[3] || b[2]) - parsePercent(a[3] || a[2]))
+        .slice(0, 3)
+        .map((row) => [row[0], row[3] || row[2]]),
+      caption: '예금 금리',
     },
 ].filter(Boolean)
 })
 
 function formatRate(value) {
   return Number.isFinite(value) ? `${value.toFixed(2)}%` : '-'
+}
+
+function parsePercent(value) {
+  const number = Number(String(value ?? '').replace(/[^0-9.-]/g, ''))
+  return Number.isFinite(number) ? number : -Infinity
+}
+
+function buildCreditSummaryRows(rows, labels) {
+  return labels
+    .map((label) => rows.find((row) => normalizeCreditLabel(row[0]) === label))
+    .map((row) => row && [normalizeCreditLabel(row[0]), row[1]])
+    .filter(Boolean)
+}
+
+function normalizeCreditLabel(value) {
+  const label = String(value ?? '').trim()
+  if (label === '국채') return '국채'
+  if (label.startsWith('AAA')) return 'AAA'
+  if (label.startsWith('BBB')) return 'BBB'
+  return label.replace(/[+-]$/, '').replace(/\d+$/, '')
 }
 
 const curatedBonds = computed(() => {
@@ -216,6 +243,7 @@ onMounted(async () => {
         <button type="button" @click="$emit('navigate', 'indicators')">자세히 보기</button>
       </div>
       <div class="indicator-carousel-shell">
+        <!--
         <button
           class="carousel-control prev"
           type="button"
@@ -224,6 +252,7 @@ onMounted(async () => {
         >
           ‹
         </button>
+        -->
         <section
           ref="indicatorCarousel"
           class="indicator-grid home-indicator-carousel"
@@ -252,12 +281,10 @@ onMounted(async () => {
             <template v-else>
               <strong>{{ indicator.value }}</strong>
               <span class="card-caption">{{ indicator.caption }}</span>
-              <svg viewBox="0 0 150 58" class="sparkline" aria-hidden="true">
-                <polyline points="4,34 28,30 52,33 76,28 100,26 124,31 146,24" />
-              </svg>
             </template>
           </button>
         </section>
+        <!--
         <button
           class="carousel-control next"
           type="button"
@@ -266,6 +293,7 @@ onMounted(async () => {
         >
           ›
         </button>
+        -->
       </div>
     </section>
 
@@ -339,12 +367,9 @@ onMounted(async () => {
 }
 
 .home-indicator-carousel {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scroll-snap-type: x proximity;
-  scrollbar-width: none;
 }
 
 .home-indicator-carousel::-webkit-scrollbar {
@@ -353,10 +378,7 @@ onMounted(async () => {
 
 .indicator-carousel-shell {
   position: relative;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: center;
+  display: block;
 }
 
 .carousel-control {
@@ -381,17 +403,8 @@ onMounted(async () => {
 }
 
 .home-indicator-carousel .metric-card {
-  flex: 0 0 260px;
+  width: 100%;
   min-height: 190px;
-  scroll-snap-align: start;
-}
-
-.home-indicator-carousel .metric-card:first-child {
-  flex-basis: 310px;
-}
-
-.home-indicator-carousel .metric-card:last-child {
-  flex-basis: 230px;
 }
 
 .mini-rate-table {
@@ -688,6 +701,10 @@ onMounted(async () => {
     min-height: auto;
   }
 
+  .home-indicator-carousel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .guide-strip {
     display: grid;
     align-items: stretch;
@@ -701,6 +718,10 @@ onMounted(async () => {
 
   .home-hero {
     padding: 20px;
+  }
+
+  .home-indicator-carousel {
+    grid-template-columns: 1fr;
   }
 
   .hero-copy p:not(.eyebrow) {
