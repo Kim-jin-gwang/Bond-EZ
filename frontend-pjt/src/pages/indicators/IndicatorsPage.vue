@@ -25,12 +25,15 @@ const visibleIndicators = computed(() =>
 const treasuryIndicator = computed(() => indicators.value.find((indicator) => indicator.id === 'treasury-rate'))
 const centralBankIndicator = computed(() => indicators.value.find((indicator) => indicator.id === 'central-bank-rate'))
 const yieldSpreadIndicator = computed(() => indicators.value.find((indicator) => indicator.id === 'yield-spread'))
+const depositIndicator = computed(() => indicators.value.find((indicator) => indicator.id === 'deposit-compare'))
 const isRateDashboard = computed(() =>
   activeIndicator.value?.id === 'treasury-rate' || activeIndicator.value?.id === 'central-bank-rate',
 )
 
 const creditRateView = ref('rates')
 const creditBaseDate = ref('2024-10-16')
+const depositBankFilter = ref('all')
+const depositSortMode = ref('prime-desc')
 
 const gradedRateColumns = ['등급', '2021.12.31', '2022.12.30', '2023.12.29', '2024.10.02', '2024.10.08', '2024.10.16']
 const gradedRateRows = [
@@ -204,6 +207,50 @@ const yieldSpreadInterpretation = computed(() => {
   ]
 })
 
+const depositRows = computed(() => {
+  const rows = depositIndicator.value?.tableRows || []
+
+  return rows.map((row, index) => ({
+    bank: row[0],
+    product: row[1],
+    baseRate: parseRate(row[2]),
+    primeRate: parseRate(row[3]),
+    baseRateLabel: row[2],
+    primeRateLabel: row[3],
+    originalIndex: index,
+  }))
+})
+
+const depositBankOptions = computed(() => [
+  'all',
+  ...new Set(depositRows.value.map((row) => row.bank).filter(Boolean)),
+])
+
+const filteredDepositRows = computed(() => {
+  const rows = depositBankFilter.value === 'all'
+    ? [...depositRows.value]
+    : depositRows.value.filter((row) => row.bank === depositBankFilter.value)
+  const sortKey = depositSortMode.value === 'base-desc' ? 'baseRate' : 'primeRate'
+  const secondarySortKey = depositSortMode.value === 'base-desc' ? 'primeRate' : 'baseRate'
+
+  return rows.sort((a, b) => {
+    const primaryDiff = getSortableRate(b, sortKey) - getSortableRate(a, sortKey)
+    if (primaryDiff !== 0) return primaryDiff
+
+    const secondaryDiff = getSortableRate(b, secondarySortKey) - getSortableRate(a, secondarySortKey)
+    if (secondaryDiff !== 0) return secondaryDiff
+
+    return `${a.bank}-${a.product}`.localeCompare(`${b.bank}-${b.product}`, 'ko')
+  }).map((row, index) => ({
+    ...row,
+    rank: index + 1,
+  }))
+})
+
+const depositBestRow = computed(() => {
+  return [...depositRows.value].sort((a, b) => (b.primeRate ?? -Infinity) - (a.primeRate ?? -Infinity))[0]
+})
+
 const treasuryAxisTicks = [10, 5, 0]
 const treasuryTerms = [
   { key: 'rate3y', label: '3년 금리' },
@@ -222,6 +269,10 @@ function formatRateGap(value) {
 function parseRate(value) {
   const number = Number(String(value ?? '').replace(/[^0-9.-]/g, ''))
   return Number.isFinite(number) ? number : null
+}
+
+function getSortableRate(row, key) {
+  return Number.isFinite(row[key]) ? row[key] : -Infinity
 }
 
 function treasuryBarHeight(rate) {
@@ -599,6 +650,108 @@ onMounted(async () => {
         <p v-else>
           스프레드는 국고채 대비 추가 수익률입니다. 스프레드가 확대되면 시장이 신용위험을 더 크게 반영하고 있다는 뜻이므로, 수익률뿐 아니라 발행사 재무와 유동성도 함께 확인해야 합니다.
         </p>
+      </section>
+    </article>
+
+    <article v-else-if="activeIndicator && activeIndicator.id === 'deposit-compare'" class="indicator-detail-card deposit-detail-card">
+      <header class="indicator-detail-header">
+        <div>
+          <p class="eyebrow">Deposit Rates</p>
+          <h2>예금 금리 비교</h2>
+        </div>
+        <div class="indicator-current-value">
+          <span>우대금리 기준</span>
+          <strong>{{ depositBestRow?.primeRateLabel ?? activeIndicator.value }}</strong>
+          <small>{{ depositBestRow ? `${depositBestRow.bank} · ${depositBestRow.product}` : activeIndicator.caption }}</small>
+        </div>
+      </header>
+
+      <section class="indicator-explanation">
+        <h3>개념 설명</h3>
+        <p>은행별 예금 상품의 기본금리와 우대금리를 비교합니다. 그래프보다 은행 필터와 금리 정렬을 통해 조건에 맞는 상품을 빠르게 찾는 데 초점을 둡니다.</p>
+      </section>
+
+      <section class="deposit-filter-panel" aria-label="예금 금리 필터">
+        <div>
+          <strong>은행별 보기</strong>
+          <div class="deposit-filter-chips">
+            <button
+              v-for="bank in depositBankOptions"
+              :key="bank"
+              :class="{ active: depositBankFilter === bank }"
+              type="button"
+              @click="depositBankFilter = bank"
+            >
+              {{ bank === 'all' ? '전체 은행' : bank }}
+            </button>
+          </div>
+        </div>
+        <div>
+          <strong>정렬 기준</strong>
+          <div class="deposit-filter-chips">
+            <button
+              :class="{ active: depositSortMode === 'prime-desc' }"
+              type="button"
+              @click="depositSortMode = 'prime-desc'"
+            >
+              우대금리 높은 순
+            </button>
+            <button
+              :class="{ active: depositSortMode === 'base-desc' }"
+              type="button"
+              @click="depositSortMode = 'base-desc'"
+            >
+              기본금리 높은 순
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="indicator-table-panel deposit-table-panel">
+        <div class="panel-title">
+          <div>
+            <h3>예금 상품 목록</h3>
+            <p>{{ depositBankFilter === 'all' ? '전체 은행' : depositBankFilter }} · {{ depositSortMode === 'prime-desc' ? '우대금리 높은 순' : '기본금리 높은 순' }}</p>
+          </div>
+          <span>{{ filteredDepositRows.length }}개 항목</span>
+        </div>
+        <div class="indicator-table-wrap">
+          <table class="indicator-data-table deposit-rate-table">
+            <thead>
+              <tr>
+                <th>순위</th>
+                <th>은행</th>
+                <th>상품명</th>
+                <th :class="{ sorted: depositSortMode === 'base-desc' }">기본금리</th>
+                <th :class="{ sorted: depositSortMode === 'prime-desc' }">우대금리</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in filteredDepositRows" :key="`${row.bank}-${row.product}`">
+                <td>
+                  <span class="deposit-rank">{{ row.rank }}</span>
+                </td>
+                <th scope="row">{{ row.bank }}</th>
+                <td>{{ row.product }}</td>
+                <td :class="{ sorted: depositSortMode === 'base-desc' }">
+                  <strong class="deposit-rate-value" :class="{ primary: depositSortMode === 'base-desc' }">
+                    {{ row.baseRateLabel }}
+                  </strong>
+                </td>
+                <td :class="{ sorted: depositSortMode === 'prime-desc' }">
+                  <strong class="deposit-rate-value" :class="{ primary: depositSortMode === 'prime-desc' }">
+                    {{ row.primeRateLabel }}
+                  </strong>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="deposit-reading-note">
+        <h3>데이터 요약 및 읽는 법</h3>
+        <p>예금은 원금 보장 여부가 상품마다 다르기 때문에 채권 수익률과 단순 비교하기보다 투자 기간과 위험을 함께 봐야 합니다. 특히 우대금리는 조건 충족 시 받을 수 있는 최대 금리일 수 있으므로, 실제 가입 전에는 우대 조건과 예치 기간, 한도, 중도해지 금리를 함께 확인해야 합니다.</p>
       </section>
     </article>
 
@@ -1795,6 +1948,140 @@ onMounted(async () => {
   margin-top: 0;
 }
 
+.deposit-detail-card {
+  background: transparent;
+  box-shadow: none;
+}
+
+.deposit-filter-panel,
+.deposit-table-panel,
+.deposit-reading-note {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  box-shadow: var(--shadow);
+}
+
+.deposit-filter-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.6fr);
+  gap: 16px;
+  padding: 18px;
+}
+
+.deposit-filter-panel > div {
+  display: grid;
+  gap: 10px;
+}
+
+.deposit-filter-panel strong {
+  color: var(--primary-dark);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.deposit-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.deposit-filter-chips button {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 12px;
+  color: var(--text);
+  background: #f8fbfd;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.deposit-filter-chips button.active {
+  border-color: var(--primary-dark);
+  color: white;
+  background: var(--primary-dark);
+}
+
+.deposit-table-panel {
+  padding: 18px;
+}
+
+.deposit-rate-table {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.deposit-rate-table th,
+.deposit-rate-table td {
+  padding: 16px 18px;
+  vertical-align: middle;
+}
+
+.deposit-rate-table thead th {
+  background: #eef5f8;
+  color: var(--primary-dark);
+}
+
+.deposit-rate-table thead th.sorted,
+.deposit-rate-table td.sorted {
+  background: #f0faf7;
+}
+
+.deposit-rate-table tbody tr:nth-child(even) {
+  background: #fbfdff;
+}
+
+.deposit-rate-table tbody tr:hover {
+  background: #f3faf9;
+}
+
+.deposit-rate-table tbody th {
+  color: var(--primary-dark);
+  font-weight: 900;
+}
+
+.deposit-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  color: var(--primary-dark);
+  background: #eef5f8;
+  font-size: 12px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.deposit-rate-value {
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.deposit-rate-value.primary {
+  color: var(--primary);
+}
+
+.deposit-reading-note {
+  padding: 18px;
+}
+
+.deposit-reading-note h3 {
+  margin-bottom: 8px;
+  font-size: 18px;
+}
+
+.deposit-reading-note p {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.7;
+}
+
 .indicator-stat-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1829,7 +2116,8 @@ onMounted(async () => {
   .base-rate-summary-grid,
   .rate-spread-summary-grid,
   .spread-summary-grid,
-  .spread-chart-grid {
+  .spread-chart-grid,
+  .deposit-filter-panel {
     grid-template-columns: 1fr;
   }
 
