@@ -114,6 +114,15 @@ function compareSelectedBonds() {
     bonds: selectedBonds.value,
   })
 }
+
+function formatOptionLabel(option) {
+  const label = String(option || '').trim()
+
+  if (!label || label === '-') return '-'
+  if (label.includes('해당사항없음') || label.includes('해당 사항 없음')) return '해당사항 없음'
+  if (label.includes('없음')) return '없음'
+  return label
+}
 </script>
 
 <template>
@@ -204,17 +213,17 @@ function compareSelectedBonds() {
                 @change="toggleBondSelection(bond.code)"
               />
             </td>
-            <td>
+            <td class="bond-title-cell">
               <div class="bond-name-cell">
                 <strong>{{ bond.name }}</strong>
                 <span class="code">{{ bond.code }} · {{ bond.shortCode }}</span>
               </div>
             </td>
-            <td>
+            <td class="issuer-cell">
               <strong>{{ bond.issuer }}</strong>
               <span>{{ bond.industry }}</span>
             </td>
-            <td>
+            <td class="classification-cell">
               <span class="market-badge" :class="bond.marketType === '장내' ? 'internal' : 'external'">{{ bond.marketType }}</span>
               <span class="nowrap">{{ bond.type }} · {{ bond.seniority }}</span>
               <span class="nowrap">{{ bond.rating }}</span>
@@ -222,15 +231,15 @@ function compareSelectedBonds() {
             <td class="price">{{ bond.price }}</td>
             <td :class="bond.change.startsWith('+') ? 'up' : 'down'">{{ bond.change }}</td>
             <td class="yields">{{ bond.buyYield }} / {{ bond.sellYield }}</td>
-            <td>
-              <strong>{{ bond.option }}</strong>
+            <td class="option-cell">
+              <strong>{{ formatOptionLabel(bond.option) }}</strong>
               <span class="nowrap">{{ bond.optionExercise?.startDate1 || '-' }}</span>
             </td>
-            <td>
+            <td class="maturity-cell">
               <strong>{{ bond.maturity }}</strong>
               <span class="nowrap">{{ bond.interestCycle }} · {{ bond.interestType }}</span>
             </td>
-            <td><button class="small-action" type="button" @click="$emit('navigate', 'detail', { bond })">상세정보</button></td>
+            <td class="action-cell"><button class="small-action" type="button" @click="$emit('navigate', 'detail', { bond })">상세정보</button></td>
           </tr>
           <tr v-if="!isLoading && filteredBonds.length === 0">
             <td colspan="10" class="empty-cell">
@@ -311,13 +320,28 @@ function compareSelectedBonds() {
 }
 
 .market-page table {
-  table-layout: auto;
-  min-width: 1040px;
+  table-layout: fixed;
+  min-width: 0;
 }
 
 .market-page th,
 .market-page td {
+  overflow: hidden;
+  padding: 13px 10px;
   vertical-align: middle;
+}
+
+.market-page th:last-child,
+.market-page td:last-child {
+  padding-right: 18px;
+}
+
+.market-page th {
+  font-size: 13px;
+}
+
+.market-page .table-wrap {
+  overflow: hidden;
 }
 
 .market-toolbar {
@@ -352,6 +376,23 @@ tr.selected {
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+}
+
+.bond-name-cell strong,
+.issuer-cell strong,
+.classification-cell span,
+.option-cell strong,
+.maturity-cell strong,
+.maturity-cell span {
+  display: block;
+  overflow: hidden;
+  max-width: 100%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.action-cell {
+  text-align: right;
 }
 
 .bond-name-cell .code {
@@ -432,18 +473,19 @@ tr.selected {
 }
 
 .small-action {
-  min-width: 58px;
+  min-width: 52px;
+  padding-inline: 8px;
   white-space: nowrap;
 }
 
 .market-page th:first-child,
 .market-page td:first-child {
-  width: 52px;
+  width: 44px;
 }
 
 .market-page th:nth-child(2),
 .market-page td:nth-child(2) {
-  width: 19%;
+  width: 18%;
 }
 
 .market-page th:nth-child(3),
@@ -453,31 +495,34 @@ tr.selected {
 
 .market-page th:nth-child(4),
 .market-page td:nth-child(4) {
-  width: 11%;
+  width: 14%;
 }
 
 .market-page th:nth-child(5),
 .market-page td:nth-child(5),
 .market-page th:nth-child(6),
 .market-page td:nth-child(6) {
-  width: 9%;
+  width: 8%;
 }
 
 .market-page th:nth-child(7),
-.market-page td:nth-child(7),
+.market-page td:nth-child(7) {
+  width: 10%;
+}
+
 .market-page th:nth-child(8),
 .market-page td:nth-child(8) {
-  width: 12%;
+  width: 11%;
 }
 
 .market-page th:nth-child(9),
 .market-page td:nth-child(9) {
-  width: 12%;
+  width: 11%;
 }
 
 .market-page th:nth-child(10),
 .market-page td:nth-child(10) {
-  width: 6%;
+  width: 8%;
 }
 
 </style>

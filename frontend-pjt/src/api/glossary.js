@@ -1,10 +1,33 @@
 import { cachedQuery } from './cache'
 import { apiGet } from './client'
 
+const PAGE_SIZE = 100
+
 export function fetchGlossaryTerms() {
-  return cachedQuery('glossary:list', async () => {
-    const data = await apiGet('/glossary')
-    return getItems(data).map(normalizeTerm)
+  return cachedQuery('glossary:list:all', async () => {
+    const glossaryItems = []
+    let page = 1
+
+    while (true) {
+      const data = await apiGet('/glossary', { params: { page, size: PAGE_SIZE } })
+      const items = getItems(data)
+      glossaryItems.push(...items.map(normalizeTerm))
+
+      if (items.length < PAGE_SIZE) {
+        break
+      }
+
+      page += 1
+    }
+
+    return glossaryItems
+  })
+}
+
+export function fetchGlossaryCategories() {
+  return cachedQuery('glossary:categories', async () => {
+    const data = await apiGet('/glossary/categories')
+    return getItems(data).map((item) => item.category_name || item.category || '').filter(Boolean)
   })
 }
 

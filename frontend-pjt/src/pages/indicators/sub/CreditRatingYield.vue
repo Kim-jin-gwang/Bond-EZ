@@ -1,49 +1,101 @@
 <script setup>
-import { computed, ref } from 'vue'
-import { getIndicators } from '../../../api/indicators'
+import IndicatorTable from './IndicatorTable.vue'
 
-const indicators = getIndicators()
-
-const activeRange = ref('3개월')
-const ranges = ['1개월', '3개월', '1년']
-
-const indicator = computed(() => indicators.find(i => i.id === 'credit-rating-yield'))
+defineProps({
+  indicator: {
+    type: Object,
+    required: true,
+  },
+})
 </script>
 
 <template>
-  <div v-if="indicator" class="indicator-content">
-    <section class="insight-panel">
+  <article class="credit-rate-board">
+    <header class="credit-board-header">
       <div>
-        <p class="eyebrow">투자 지표 상세 보기</p>
-        <h1>{{ indicator.title }}</h1>
-        <p>{{ indicator.summary }}</p>
+        <p class="eyebrow">Credit Rating Rates</p>
+        <h2>신용등급 금리</h2>
+        <p>DB의 채권 시세 데이터를 기준으로 신용등급별 평균 수익률을 비교합니다.</p>
       </div>
-      <div class="range-buttons">
-        <button
-          v-for="range in ranges"
-          :key="range"
-          :class="{ active: activeRange === range }"
-          type="button"
-          @click="activeRange = range"
-        >
-          {{ range }}
-        </button>
-      </div>
-    </section>
+    </header>
 
-    <section class="indicator-detail-grid">
-      <article v-for="stat in indicator.stats" :key="stat.label">
-        <span>{{ stat.label }}</span>
-        <strong>{{ stat.value }}</strong>
+    <section class="credit-guide-grid" aria-label="신용등급 지표 해석 안내">
+      <article>
+        <strong>등급별 평균 금리</strong>
+        <p>같은 시점에서 신용등급별 평균 수익률을 비교합니다. 등급이 낮을수록 위험 보상 요구가 커질 수 있습니다.</p>
+      </article>
+      <article>
+        <strong>채권 수</strong>
+        <p>평균 수익률 계산에 포함된 채권 수입니다. 표본 수가 적은 등급은 해석에 주의가 필요합니다.</p>
+      </article>
+      <article>
+        <strong>주의해서 볼 점</strong>
+        <p>높은 금리는 높은 보상일 수도 있지만 신용위험, 유동성위험, 발행사 이슈가 반영된 결과일 수 있습니다.</p>
       </article>
     </section>
 
-    <svg viewBox="0 0 720 240" class="large-chart" :aria-label="`${indicator.title} 차트`">
-      <polyline :points="indicator.chartPoints" />
-      <line x1="20" y1="200" x2="700" y2="200" />
-      <line x1="20" y1="40" x2="20" y2="200" />
-    </svg>
+    <section class="credit-table-wrap">
+      <IndicatorTable :columns="indicator.tableColumns" :rows="indicator.tableRows" />
+    </section>
 
-    <p class="insight-text">{{ indicator.insight }}</p>
-  </div>
+    <section class="credit-board-note">
+      <h3>등급별 금리 해석</h3>
+      <p>{{ indicator.insight }}</p>
+    </section>
+  </article>
 </template>
+
+<style scoped>
+.credit-rate-board {
+  display: grid;
+  gap: 20px;
+}
+
+.credit-board-header h2 {
+  margin-bottom: 8px;
+  font-size: clamp(28px, 4vw, 40px);
+}
+
+.credit-board-header p:not(.eyebrow) {
+  margin-bottom: 0;
+}
+
+.credit-guide-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.credit-guide-grid article,
+.credit-table-wrap,
+.credit-board-note {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  box-shadow: var(--shadow);
+}
+
+.credit-guide-grid strong {
+  color: var(--primary-dark);
+  font-size: 14px;
+}
+
+.credit-guide-grid p,
+.credit-board-note p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.credit-board-note h3 {
+  margin-bottom: 8px;
+  font-size: 18px;
+}
+
+@media (max-width: 960px) {
+  .credit-guide-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

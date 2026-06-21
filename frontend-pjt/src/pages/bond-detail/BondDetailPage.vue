@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, h, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { fetchBondDetail } from '../../api/bonds'
 
@@ -10,6 +10,29 @@ const props = defineProps({
   },
 })
 
+const InfoTable = {
+  props: {
+    rows: {
+      type: Array,
+      required: true,
+    },
+  },
+  setup(props) {
+    return () => h('div', { class: 'info-table-wrap' }, [
+      h('table', { class: 'info-table' }, [
+        h('tbody', props.rows.map((row) =>
+          h('tr', { key: row.join('-') }, [
+            h('th', { scope: 'row' }, row[0]),
+            h('td', row[1] || '-'),
+            h('th', { scope: 'row' }, row[2]),
+            h('td', row[3] || '-'),
+          ]),
+        )),
+      ]),
+    ])
+  },
+}
+
 const selectedBond = reactive({
   ...props.selectedBond,
 })
@@ -18,8 +41,9 @@ const hasBondData = computed(() => Boolean(selectedBond.bondId || selectedBond.c
 
 const investmentAmount = ref(1000000)
 const purchaseDate = ref('2026-06-14')
+const sellDate = ref(selectedBond.maturityDate || '')
 const purchasePrice = ref(selectedBond.priceValue)
-const scenario = ref(selectedBond.optionType === 'CALL' ? 'call_1' : 'maturity')
+const scenario = ref('maturity')
 const investorType = ref('개인')
 const taxMode = ref('종합과세')
 
@@ -42,17 +66,7 @@ const faceAmount = computed(() => purchaseUnits.value * faceValuePerUnit)
 const paymentMonths = computed(() => Number(selectedBond.paymentCycleMonths) || 12)
 const paymentsPerYear = computed(() => Math.max(1, 12 / paymentMonths.value))
 const periodCoupon = computed(() => faceAmount.value * (selectedBond.couponRate / 100) / paymentsPerYear.value)
-const scenarioDate = computed(() => {
-  if (scenario.value === 'call_1' && selectedBond.optionExercise?.startDate1) {
-    return selectedBond.optionExercise.startDate1
-  }
-
-  if (scenario.value === 'call_2' && selectedBond.optionExercise?.startDate2) {
-    return selectedBond.optionExercise.startDate2
-  }
-
-  return selectedBond.maturityDate
-})
+const scenarioDate = computed(() => sellDate.value || selectedBond.maturityDate)
 const investmentDays = computed(() => daysBetween(purchaseDate.value, scenarioDate.value))
 const investmentPeriodText = computed(() => formatPeriod(investmentDays.value))
 const expectedPeriods = computed(() => Math.max(1, Math.ceil(investmentDays.value / 365 * paymentsPerYear.value)))
@@ -68,43 +82,60 @@ const afterTaxReturnRate = computed(() =>
 )
 
 const scenarioOptions = computed(() => {
-  const options = [{ value: 'maturity', label: '만기상환' }]
+  const options = [{ value: 'maturity', label: '만기상환', date: selectedBond.maturityDate }]
 
   if (selectedBond.optionExercise?.startDate1) {
-    options.unshift({ value: 'call_1', label: 'CALL 1차' })
+    options.unshift({
+      value: 'call_1',
+      label: 'CALL 1차',
+      date: selectedBond.optionExercise.startDate1,
+    })
   }
 
   if (selectedBond.optionExercise?.startDate2) {
-    options.unshift({ value: 'call_2', label: 'CALL 2차' })
+    options.unshift({
+      value: 'call_2',
+      label: 'CALL 2차',
+      date: selectedBond.optionExercise.startDate2,
+    })
   }
 
   return options
 })
 
+const summaryMetaText = computed(() =>
+  [
+    selectedBond.code,
+    selectedBond.shortCode,
+    selectedBond.issuer,
+    selectedBond.option ? `${selectedBond.option} 옵션` : null,
+  ].filter((item) => item && item !== '-').join(' · '),
+)
+
 const summaryMetrics = computed(() => [
-  { label: '매수수익률', value: selectedBond.buyYield },
-  { label: '표면금리', value: selectedBond.coupon },
-  { label: '신용등급', value: selectedBond.rating },
-  { label: '다음 옵션일', value: selectedBond.optionExercise?.startDate1 || '-' },
+  { label: '매수수익률', value: displayValue(selectedBond.buyYield) },
+  { label: '표면금리', value: displayValue(selectedBond.coupon) },
+  { label: '신용등급', value: displayValue(selectedBond.rating) },
+  { label: '다음 옵션일', value: displayValue(selectedBond.optionExercise?.startDate1) },
 ])
 
 const issueRows = computed(() => [
-  ['표준코드', selectedBond.code, '단축코드', selectedBond.shortCode],
-  ['종목명', selectedBond.name, '종목약명', selectedBond.shortName],
-  ['발행기관', selectedBond.issuer, '산업', selectedBond.industry],
-  ['채권종류', selectedBond.type, '선후순위', selectedBond.seniority],
-  ['발행일', selectedBond.issueDate, '상장일', selectedBond.listingDate],
-  ['만기일', selectedBond.maturityDate, '발행금액', `${selectedBond.issueAmount}원`],
-  ['상환방법', selectedBond.redemptionMethod, '만기상환율', selectedBond.maturityRedemptionRate],
-  ['대표주관회사', selectedBond.underwriter, '보증여부', selectedBond.guaranteeStatus],
+  ['표준코드', displayValue(selectedBond.code), '단축코드', displayValue(selectedBond.shortCode)],
+  ['종목명', displayValue(selectedBond.name), '종목약명', displayValue(selectedBond.shortName)],
+  ['발행기관', displayValue(selectedBond.issuer), '산업', displayValue(selectedBond.industry)],
+  ['채권종류', displayValue(selectedBond.type), '선후순위', displayValue(selectedBond.seniority)],
+  ['발행일', displayValue(selectedBond.issueDate), '상장일', displayValue(selectedBond.listingDate)],
+  ['만기일', displayValue(selectedBond.maturityDate), '발행금액', formatWonValue(selectedBond.issueAmount)],
+  ['상환방법', displayValue(selectedBond.redemptionMethod), '만기상환율', displayValue(selectedBond.maturityRedemptionRate)],
+  ['대표주관회사', displayValue(selectedBond.underwriter), '보증여부', displayValue(selectedBond.guaranteeStatus)],
 ])
 
 const interestRows = computed(() => [
-  ['이자방식', selectedBond.interestType, '이자지급방법', selectedBond.interestPaymentMethod],
-  ['표면이율', selectedBond.coupon, '이자주기', selectedBond.interestCycle],
-  ['지급단위월수', `${selectedBond.interestPaymentUnitMonths}개월`, '계산월수', `${selectedBond.interestCalculationMonths}개월`],
-  ['선후급구분', selectedBond.interestPrePostType, '최초지급일', selectedBond.firstInterestPaymentDate],
-  ['지급기준', selectedBond.interestPaymentBasis, '월말구분', selectedBond.interestMonthEndType],
+  ['이자방식', displayValue(selectedBond.interestType), '이자지급방법', displayValue(selectedBond.interestPaymentMethod)],
+  ['표면이율', displayValue(selectedBond.coupon), '이자주기', displayValue(selectedBond.interestCycle)],
+  ['지급단위월수', formatMonthCycle(selectedBond.interestPaymentUnitMonths), '계산월수', formatMonthCycle(selectedBond.interestCalculationMonths)],
+  ['선후급구분', displayValue(selectedBond.interestPrePostType), '최초지급일', displayValue(selectedBond.firstInterestPaymentDate)],
+  ['지급기준', displayValue(selectedBond.interestPaymentBasis), '월말구분', displayValue(selectedBond.interestMonthEndType)],
 ])
 
 const optionRows = computed(() => [
@@ -115,14 +146,14 @@ const optionRows = computed(() => [
 ])
 
 const marketRows = computed(() => [
-  ['현재가', selectedBond.price, '대용가격', selectedBond.substitutePrice],
-  ['매수수익률', selectedBond.buyYield, '매도수익률', selectedBond.sellYield],
-  ['만기수익률', selectedBond.ytm, '듀레이션', selectedBond.duration],
-  ['거래량', selectedBond.volume, '등락률', selectedBond.change],
+  ['현재가', displayValue(selectedBond.price), '대용가격', displayValue(selectedBond.substitutePrice)],
+  ['매수수익률', displayValue(selectedBond.buyYield), '매도수익률', displayValue(selectedBond.sellYield)],
+  ['만기수익률', displayValue(selectedBond.ytm), '듀레이션', displayValue(selectedBond.duration)],
+  ['거래량', displayValue(selectedBond.volume), '등락률', displayValue(selectedBond.change)],
 ])
 
 const selectedScenarioLabel = computed(() =>
-  scenarioOptions.value.find((item) => item.value === scenario.value)?.label || '만기상환',
+  scenarioOptions.value.find((item) => item.value === scenario.value)?.label || '직접 입력',
 )
 
 const tradeSummaryRows = computed(() => [
@@ -144,9 +175,11 @@ const profitRows = computed(() => [
 const bondConditionItems = computed(() => [
   { label: '매출일자', value: '0000/00/00' },
   { label: '발행일자', value: selectedBond.issueDate },
-  { label: '만기일자', value: scenarioDate.value },
+  { label: '매도/상환일자', value: scenarioDate.value },
   { label: '신용등급', value: selectedBond.rating },
   { label: '이자지급유형', value: selectedBond.interestPaymentMethod },
+  { label: '이자주기', value: selectedBond.interestCycle },
+  { label: '계산주기', value: formatMonthCycle(selectedBond.interestCalculationMonths) },
   { label: '표면이율', value: selectedBond.coupon },
   { label: '할인율', value: '0.0000%' },
   { label: '만기보장수익률', value: selectedBond.ytm },
@@ -174,40 +207,74 @@ const cashflowRows = computed(() => {
   const end = new Date(scenarioDate.value)
   const firstPayDate = new Date(selectedBond.firstInterestPaymentDate)
   let cursor = firstPayDate > start ? firstPayDate : addMonths(start, paymentMonths.value)
+  let lastCoveredDate = start
+
+  if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end < start) {
+    return rows
+  }
 
   while (cursor <= end && rows.length < 12) {
     const periodStart = addMonths(cursor, -paymentMonths.value)
-    const gross = periodCoupon.value
-    const incomeTax = gross * 0.14
-    const localTax = incomeTax * 0.1
-    const specialTax = 0
-    const net = gross - incomeTax - localTax - specialTax
-
-    rows.push({
-      startDate: toDateString(periodStart < start ? start : periodStart),
-      endDate: toDateString(cursor),
-      holdingType: '신보유',
-      taxBaseTotal: formatNumber(gross),
-      ownedTaxBase: formatNumber(gross),
-      unownedTaxBase: '0',
-      taxRate: '14.00',
-      incomeTax: formatNumber(incomeTax),
-      localTax: formatNumber(localTax),
-      specialTax: '0',
-      netAmount: formatNumber(net),
-    })
+    const rowStart = periodStart < start ? start : periodStart
+    rows.push(buildCashflowRow(rowStart, cursor, periodCoupon.value))
+    lastCoveredDate = cursor
 
     cursor = addMonths(cursor, paymentMonths.value)
+  }
+
+  if (lastCoveredDate < end && rows.length < 12) {
+    const nextPaymentDate = addMonths(lastCoveredDate, paymentMonths.value)
+    const periodDays = daysBetween(lastCoveredDate, nextPaymentDate)
+    const holdingDays = daysBetween(lastCoveredDate, end)
+    const proratedGross = periodDays ? periodCoupon.value * (holdingDays / periodDays) : totalGrossInterest.value
+    rows.push(buildCashflowRow(lastCoveredDate, end, proratedGross))
   }
 
   return rows
 })
 
+const visibleCashflowRows = computed(() => {
+  if (cashflowRows.value.length > 0) {
+    return cashflowRows.value
+  }
+
+  const start = new Date(purchaseDate.value)
+  const end = new Date(scenarioDate.value)
+
+  if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end < start) {
+    return []
+  }
+
+  return [buildCashflowRow(start, end, totalGrossInterest.value)]
+})
+
+function buildCashflowRow(startDate, endDate, grossAmount) {
+  const gross = Number(grossAmount) || 0
+  const incomeTax = gross * 0.14
+  const localTax = incomeTax * 0.1
+  const specialTax = 0
+  const net = gross - incomeTax - localTax - specialTax
+
+  return {
+    startDate: toDateString(startDate),
+    endDate: toDateString(endDate),
+    holdingType: '신보유',
+    taxBaseTotal: formatNumber(gross),
+    ownedTaxBase: formatNumber(gross),
+    unownedTaxBase: '0',
+    taxRate: '14.00',
+    incomeTax: formatNumber(incomeTax),
+    localTax: formatNumber(localTax),
+    specialTax: '0',
+    netAmount: formatNumber(net),
+  }
+}
+
 watch(() => props.selectedBond, (bond) => {
   if (bond) {
     Object.assign(selectedBond, bond)
     purchasePrice.value = selectedBond.priceValue
-    scenario.value = selectedBond.optionType === 'CALL' ? 'call_1' : 'maturity'
+    setScenarioDate('maturity')
   }
 })
 
@@ -222,8 +289,21 @@ onMounted(async () => {
   if (bond) {
     Object.assign(selectedBond, bond)
     purchasePrice.value = selectedBond.priceValue
+    setScenarioDate('maturity')
   }
 })
+
+function setScenarioDate(value) {
+  const option = scenarioOptions.value.find((item) => item.value === value)
+
+  scenario.value = value
+  sellDate.value = option?.date || selectedBond.maturityDate || ''
+}
+
+function handleSellDateInput() {
+  const matchedOption = scenarioOptions.value.find((item) => item.date === sellDate.value)
+  scenario.value = matchedOption?.value || 'custom'
+}
 
 function parsePercent(value) {
   return Number(String(value).replace('%', '')) / 100 || 1
@@ -247,6 +327,23 @@ function formatPeriod(days) {
   return `${days.toLocaleString()}일 (${years}년 ${months}월 ${restDays}일)`
 }
 
+function formatMonthCycle(value) {
+  if (!value || value === '-') return '-'
+  return `${value}개월`
+}
+
+function displayValue(value) {
+  if (value === null || value === undefined || value === '') return '-'
+  return value
+}
+
+function formatWonValue(value) {
+  if (value === null || value === undefined || value === '') return '-'
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return `${value}원`
+  return `${numeric.toLocaleString()}원`
+}
+
 function toDateString(date) {
   return date.toISOString().slice(0, 10)
 }
@@ -266,7 +363,7 @@ function formatCurrency(value) {
       <div class="summary-copy">
         <p class="eyebrow">Bond Detail</p>
         <h1>{{ selectedBond.name }}</h1>
-        <p>{{ selectedBond.code }} · {{ selectedBond.shortCode }} · {{ selectedBond.issuer }} · {{ selectedBond.option }} 옵션</p>
+        <p>{{ summaryMetaText }}</p>
       </div>
 
       <div class="summary-metrics">
@@ -331,7 +428,7 @@ function formatCurrency(value) {
             :key="item.value"
             :class="{ active: scenario === item.value }"
             type="button"
-            @click="scenario = item.value"
+            @click="setScenarioDate(item.value)"
           >
             {{ item.label }}
           </button>
@@ -348,6 +445,10 @@ function formatCurrency(value) {
           <label>
             <span>매수일자</span>
             <input v-model="purchaseDate" type="date" />
+          </label>
+          <label>
+            <span>매도일자</span>
+            <input v-model="sellDate" type="date" @input="handleSellDateInput" />
           </label>
           <label>
             <span>매수단가</span>
@@ -442,7 +543,7 @@ function formatCurrency(value) {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="row in cashflowRows" :key="`${row.startDate}-${row.endDate}`">
+              <tr v-for="row in visibleCashflowRows" :key="`${row.startDate}-${row.endDate}`">
                 <td>{{ row.startDate }}</td>
                 <td>{{ row.endDate }}</td>
                 <td>{{ row.holdingType }}</td>
@@ -463,35 +564,6 @@ function formatCurrency(value) {
     </section>
   </section>
 </template>
-
-<script>
-export default {
-  components: {
-    InfoTable: {
-      props: {
-        rows: {
-          type: Array,
-          required: true,
-        },
-      },
-      template: `
-        <div class="info-table-wrap">
-          <table class="info-table">
-            <tbody>
-              <tr v-for="row in rows" :key="row.join('-')">
-                <th scope="row">{{ row[0] }}</th>
-                <td>{{ row[1] }}</td>
-                <th scope="row">{{ row[2] }}</th>
-                <td>{{ row[3] }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      `,
-    },
-  },
-}
-</script>
 
 <style scoped>
 .erd-detail {
@@ -577,7 +649,10 @@ export default {
   margin-bottom: 0;
 }
 
-:deep(.info-table-wrap),
+:deep(.info-table-wrap) {
+  overflow-x: visible;
+}
+
 .cashflow-grid-wrap {
   overflow-x: auto;
 }
@@ -592,7 +667,8 @@ export default {
 }
 
 :deep(.info-table) {
-  min-width: 760px;
+  min-width: 0;
+  table-layout: fixed;
 }
 
 :deep(.info-table th),
@@ -606,6 +682,14 @@ export default {
   padding: 11px 12px;
   border: 1px solid var(--line);
   font-size: 13px;
+}
+
+:deep(.info-table th),
+:deep(.info-table td) {
+  width: 25%;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
 }
 
 :deep(.info-table th),

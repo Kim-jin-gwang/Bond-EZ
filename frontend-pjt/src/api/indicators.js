@@ -5,12 +5,12 @@ const INDICATOR_META = {
   'treasury-rate': {
     shortTitle: '나라별 금리',
     summary: '국고채와 미국채 금리를 비교해 시장이 반영하는 장단기 금리 수준을 확인합니다.',
-    insight: '장기 금리가 단기 금리보다 높거나 낮은지 함께 보면 금리 방향성과 만기 부담을 판단하는 데 도움이 됩니다.',
+    insight: '장기 금리가 단기 금리보다 얼마나 높은지 함께 보면 금리 방향성과 만기 부담을 판단하는 데 도움이 됩니다.',
   },
   'central-bank-rate': {
     shortTitle: '기준금리',
     summary: '나라별 기준금리와 주요 국채 금리를 함께 확인합니다.',
-    insight: '기준금리 차이는 환율, 해외 금리, 국내 채권 금리에도 영향을 줄 수 있어 함께 보는 것이 좋습니다.',
+    insight: '기준금리 차이는 환율, 해외 금리, 국내 채권 금리에도 영향을 줄 수 있어 같이 보는 것이 좋습니다.',
   },
   'credit-rating-yield': {
     shortTitle: '신용등급 금리',
@@ -19,23 +19,19 @@ const INDICATOR_META = {
   },
   'deposit-compare': {
     shortTitle: '예금 비교',
-    summary: '은행 예금 금리와 채권 수익률을 비교할 때 기준으로 삼을 수 있는 데이터를 확인합니다.',
-    insight: '예금은 원금 보장 여부가 다르기 때문에 채권 수익률과 단순 비교하기보다 투자 기간과 위험을 함께 봐야 합니다.',
+    summary: '은행 예금 금리와 채권 수익률을 비교할 기준 데이터를 확인합니다.',
+    insight: '예금은 원금 보장 여부가 달라 채권 수익률과 단순 비교하기보다 투자 기간과 위험을 함께 봐야 합니다.',
   },
   'yield-spread': {
     shortTitle: '장단기 금리차',
     summary: '장기 금리와 단기 금리의 차이를 통해 시장의 경기 전망과 금리 기대를 확인합니다.',
-    insight: '금리차가 축소되거나 역전될 때는 장기채 가격 변동 부담과 경기 둔화 가능성을 함께 점검하는 것이 좋습니다.',
+    insight: '금리차가 축소되거나 역전되면 장기채 가격 변동 부담과 경기 둔화 가능성을 함께 점검하는 것이 좋습니다.',
   },
   'yield-curve': {
     shortTitle: 'Yield Curve',
-    summary: '만기별 금리를 연결해 금리 곡선의 기울기를 확인합니다.',
+    summary: '만기별 금리를 연결한 금리 곡선의 기울기를 확인합니다.',
     insight: '수익률 곡선의 기울기는 시장의 금리 경로와 경기 전망을 읽는 보조 지표로 활용할 수 있습니다.',
   },
-}
-
-export function getIndicators() {
-  return []
 }
 
 export function fetchIndicators() {
@@ -44,9 +40,7 @@ export function fetchIndicators() {
       const data = await apiGet('/indicators')
       const summaries = getItems(data)
 
-      if (!summaries.length) {
-        return []
-      }
+      if (!summaries.length) return []
 
       const indicators = await Promise.all(summaries.map(fetchIndicatorDetail))
       return indicators.filter(Boolean)
@@ -57,9 +51,7 @@ export function fetchIndicators() {
 }
 
 async function fetchIndicatorDetail(summary) {
-  if (!summary?.id || !summary?.endpoint) {
-    return null
-  }
+  if (!summary?.id || !summary?.endpoint) return null
 
   try {
     const path = summary.endpoint.replace(/^\/api\/v1/, '')
@@ -80,29 +72,12 @@ function normalizeIndicator(summary, rows) {
     insight: meta.insight || '',
   }
 
-  if (summary.id === 'treasury-rate') {
-    return normalizeTreasuryRate(base, rows)
-  }
-
-  if (summary.id === 'central-bank-rate') {
-    return normalizeCentralBankRate(base, rows)
-  }
-
-  if (summary.id === 'credit-rating-yield') {
-    return normalizeCreditRatingYield(base, rows)
-  }
-
-  if (summary.id === 'deposit-compare') {
-    return normalizeDepositCompare(base, rows)
-  }
-
-  if (summary.id === 'yield-spread') {
-    return normalizeYieldSpread(base, rows)
-  }
-
-  if (summary.id === 'yield-curve') {
-    return normalizeYieldCurve(base, rows)
-  }
+  if (summary.id === 'treasury-rate') return normalizeTreasuryRate(base, rows)
+  if (summary.id === 'central-bank-rate') return normalizeCentralBankRate(base, rows)
+  if (summary.id === 'credit-rating-yield') return normalizeCreditRatingYield(base, rows)
+  if (summary.id === 'deposit-compare') return normalizeDepositCompare(base, rows)
+  if (summary.id === 'yield-spread') return normalizeYieldSpread(base, rows)
+  if (summary.id === 'yield-curve') return normalizeYieldCurve(base, rows)
 
   return null
 }
@@ -264,8 +239,7 @@ function formatPercentPoint(value) {
 }
 
 function normalizeCountry(value) {
-  if (!value) return '-'
-  return String(value)
+  return value ? String(value) : '-'
 }
 
 function toNumberOrNull(value) {
@@ -285,9 +259,7 @@ function barHeights(values) {
 function linePoints(values) {
   const numbers = values.map(Number).filter(Number.isFinite)
 
-  if (!numbers.length) {
-    return ''
-  }
+  if (!numbers.length) return ''
 
   const min = Math.min(...numbers)
   const max = Math.max(...numbers)

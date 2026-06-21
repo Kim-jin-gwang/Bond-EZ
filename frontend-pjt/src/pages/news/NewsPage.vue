@@ -6,68 +6,17 @@ const keyword = ref('')
 const selectedPublisher = ref('전체')
 const selectedDate = ref('')
 const openedSummaryId = ref(null)
-const remoteNewsItems = ref(null)
+const remoteNewsItems = ref([])
 
-const newsItems = [
-  {
-    id: 'rate-001',
-    title: '국고채 금리, 장기물 중심으로 상승 마감',
-    url: 'https://www.yna.co.kr/',
-    publisher: '연합뉴스',
-    date: '2026-06-05',
-    summary:
-      '장기물 금리가 상승하면서 채권 가격 부담이 커졌습니다. 장기 채권을 매수하려는 투자자는 금리 추가 상승 가능성과 듀레이션 위험을 함께 확인할 필요가 있습니다.',
-  },
-  {
-    id: 'rate-002',
-    title: '미국채 10년물 금리 하락, 기준금리 인하 기대 재부각',
-    url: 'https://www.reuters.com/',
-    publisher: 'Reuters',
-    date: '2026-06-04',
-    summary:
-      '미국 장기금리가 하락하며 시장의 금리 인하 기대가 다시 커졌습니다. 국내 채권시장에도 장기물 수요와 환율 변동을 통해 간접 영향을 줄 수 있습니다.',
-  },
-  {
-    id: 'rate-003',
-    title: '한국은행 기준금리 동결 이후 채권시장 변동성 확대',
-    url: 'https://www.bok.or.kr/',
-    publisher: '한국은행',
-    date: '2026-06-03',
-    summary:
-      '기준금리 동결 이후 시장은 향후 인하 시점과 물가 흐름을 다시 반영하고 있습니다. 단기채와 장기채의 반응이 다를 수 있어 만기별 금리 변화를 보는 것이 중요합니다.',
-  },
-  {
-    id: 'rate-004',
-    title: '회사채 시장, 우량 등급 중심으로 수요 회복',
-    url: 'https://www.mk.co.kr/',
-    publisher: '매일경제',
-    date: '2026-06-02',
-    summary:
-      '우량 회사채 수요가 회복되며 신용등급이 높은 발행사의 조달 여건이 개선되는 흐름입니다. 다만 등급이 낮은 회사채는 신용 스프레드를 별도로 점검해야 합니다.',
-  },
-  {
-    id: 'rate-005',
-    title: '예금 금리와 채권 수익률 격차 확대',
-    url: 'https://www.hankyung.com/',
-    publisher: '한국경제',
-    date: '2026-06-01',
-    summary:
-      '예금 대비 채권 수익률 매력이 커지고 있지만 채권은 가격 변동과 중도 매도 위험이 있습니다. 세후 수익률과 투자 기간을 함께 비교하는 접근이 필요합니다.',
-  },
-]
-
-const activeNewsItems = computed(() => remoteNewsItems.value || [])
-
-const publishers = computed(() => ['전체', ...new Set(activeNewsItems.value.map((item) => item.publisher))])
+const publishers = computed(() => ['전체', ...new Set(remoteNewsItems.value.map((item) => item.publisher).filter(Boolean))])
 
 const filteredNews = computed(() => {
   const normalizedKeyword = keyword.value.trim().toLowerCase()
 
-  return activeNewsItems.value.filter((item) => {
-    const matchesKeyword =
-      !normalizedKeyword ||
-      item.title.toLowerCase().includes(normalizedKeyword) ||
-      item.publisher.toLowerCase().includes(normalizedKeyword)
+  return remoteNewsItems.value.filter((item) => {
+    const title = String(item.title || '').toLowerCase()
+    const publisher = String(item.publisher || '').toLowerCase()
+    const matchesKeyword = !normalizedKeyword || title.includes(normalizedKeyword) || publisher.includes(normalizedKeyword)
     const matchesPublisher = selectedPublisher.value === '전체' || item.publisher === selectedPublisher.value
     const matchesDate = !selectedDate.value || item.date === selectedDate.value
 
@@ -87,12 +36,7 @@ function toggleSummary(id) {
 }
 
 onMounted(async () => {
-  try {
-    const items = await fetchNews()
-    remoteNewsItems.value = items
-  } catch {
-    remoteNewsItems.value = []
-  }
+  remoteNewsItems.value = await fetchNews()
 })
 </script>
 
@@ -188,7 +132,8 @@ onMounted(async () => {
   font-weight: 800;
 }
 
-.news-filter-panel button {
+.news-filter-panel button,
+.news-empty button {
   min-height: 42px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -202,16 +147,21 @@ onMounted(async () => {
   padding: 18px;
 }
 
-.news-list-header {
+.news-list-header,
+.news-row {
   display: flex;
   justify-content: space-between;
   gap: 16px;
   align-items: center;
+}
+
+.news-list-header {
   margin-bottom: 12px;
   padding: 0 4px;
 }
 
-.news-list-header span {
+.news-list-header span,
+.news-meta {
   color: var(--muted);
   font-size: 14px;
 }
@@ -227,18 +177,12 @@ onMounted(async () => {
 }
 
 .news-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 18px;
-  align-items: center;
   padding: 16px 18px;
 }
 
 .news-main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 260px;
-  gap: 18px;
-  align-items: center;
+  gap: 6px;
   min-width: 0;
 }
 
@@ -257,13 +201,8 @@ onMounted(async () => {
 }
 
 .news-meta {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
   gap: 12px;
-  align-items: center;
-  color: var(--muted);
-  font-size: 14px;
-  text-align: right;
 }
 
 .news-meta strong {
@@ -286,19 +225,9 @@ onMounted(async () => {
   white-space: nowrap;
 }
 
-.summary-button:hover,
-.open-news-button:hover {
-  color: white;
-  background: var(--primary);
-}
-
 .open-news-button {
   border-color: var(--line);
   color: var(--text);
-}
-
-.open-news-button:hover {
-  border-color: var(--primary);
 }
 
 .news-summary {
@@ -339,28 +268,14 @@ onMounted(async () => {
   margin-bottom: 0;
 }
 
-.news-empty button {
-  border: 1px solid var(--primary);
-  border-radius: 8px;
-  padding: 8px 14px;
-  color: var(--primary);
-  background: white;
-  font-weight: 800;
-}
-
 @media (max-width: 900px) {
   .news-filter-panel,
-  .news-row,
-  .news-main {
+  .news-row {
     grid-template-columns: 1fr;
   }
 
-  .news-actions {
-    justify-content: flex-start;
-  }
-
-  .news-meta {
-    text-align: left;
+  .news-row {
+    display: grid;
   }
 }
 </style>

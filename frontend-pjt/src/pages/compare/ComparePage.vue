@@ -28,6 +28,7 @@ const displayedBonds = computed(() => {
 const hasComparisonData = computed(() => displayedBonds.value.length === 2)
 const leftBond = computed(() => displayedBonds.value[0] || {})
 const rightBond = computed(() => displayedBonds.value[1] || {})
+const compareTitle = computed(() => `${bondDisplayName(leftBond.value)} vs ${bondDisplayName(rightBond.value)}`)
 
 const compareSections = computed(() => [
   {
@@ -136,11 +137,11 @@ const gptSummary = computed(() => {
   return {
     headline: `두 채권은 수익률, 신용등급, 만기, 듀레이션, 옵션 조건에서 차이가 있으므로 투자 목적과 보유 기간에 맞춰 추가 확인이 필요합니다.`,
     bullets: [
-      `${higherYieldBond.shortName}의 매수수익률 수치가 ${higherYieldBond.buyYield}로 더 높게 표시됩니다. 수익률 수치가 높다는 사실은 신용위험, 유동성, 옵션 조건과 함께 해석해야 합니다.`,
-      `${lowerDurationBond.shortName}의 듀레이션 수치가 ${lowerDurationBond.duration}로 더 낮게 표시됩니다. 듀레이션은 가격 변동 민감도를 보는 참고 지표 중 하나입니다.`,
-      `신용등급 표기는 ${higherRatingBond.shortName}이 더 높은 등급으로 표시됩니다. 단, 신용등급은 원리금 상환을 보장하지 않으며 투자 적합성을 의미하지 않습니다.`,
+      `${bondDisplayName(higherYieldBond)}의 매수수익률 수치가 ${higherYieldBond.buyYield}로 더 높게 표시됩니다. 수익률 수치가 높다는 사실은 신용위험, 유동성, 옵션 조건과 함께 해석해야 합니다.`,
+      `${bondDisplayName(lowerDurationBond)}의 듀레이션 수치가 ${lowerDurationBond.duration}로 더 낮게 표시됩니다. 듀레이션은 가격 변동 민감도를 보는 참고 지표 중 하나입니다.`,
+      `신용등급 표기는 ${bondDisplayName(higherRatingBond)}이 더 높은 등급으로 표시됩니다. 단, 신용등급은 원리금 상환을 보장하지 않으며 투자 적합성을 의미하지 않습니다.`,
       hasCallable.length
-        ? `${hasCallable.map((bond) => bond.shortName).join(', ')}은 CALL 옵션이 있으므로 행사 가능일, 조기상환 조건, 재투자 위험을 확인해야 합니다.`
+        ? `${hasCallable.map((bond) => bondDisplayName(bond)).join(', ')}은 CALL 옵션이 있으므로 행사 가능일, 조기상환 조건, 재투자 위험을 확인해야 합니다.`
         : '두 채권 모두 별도 CALL 옵션 항목은 확인되지 않습니다.',
     ],
     conclusion: '이 화면은 투자 권유, 매수·매도 추천, 상품의 우수성 판단을 제공하지 않습니다. 표시된 내용은 입력된 데이터 기준의 단순 비교 정보이며, 수익률이 높거나 듀레이션이 낮다는 사실이 특정 채권의 적합성 또는 안정성을 의미하지 않습니다. 투자 전 투자설명서, 신용위험, 유동성, 만기, 세금 및 수수료를 반드시 확인하세요.',
@@ -171,6 +172,10 @@ function formatValue(value, suffix = '') {
   return suffix ? `${value}${suffix}` : value
 }
 
+function bondDisplayName(bond) {
+  return bond?.shortName || bond?.name || bond?.code || '-'
+}
+
 function getHigherRatingSide(leftValue, rightValue) {
   const order = ['국채', 'AAA', 'AA', 'A', 'BBB', 'BB', 'B']
   const leftIndex = order.findIndex((item) => String(leftValue).startsWith(item))
@@ -187,12 +192,12 @@ function toNumber(value) {
 
 function pickHigher(leftValue, rightValue) {
   if (leftValue === rightValue) return '동일'
-  return leftValue > rightValue ? leftBond.value.shortName : rightBond.value.shortName
+  return leftValue > rightValue ? bondDisplayName(leftBond.value) : bondDisplayName(rightBond.value)
 }
 
 function pickLower(leftValue, rightValue) {
   if (leftValue === rightValue) return '동일'
-  return leftValue < rightValue ? leftBond.value.shortName : rightBond.value.shortName
+  return leftValue < rightValue ? bondDisplayName(leftBond.value) : bondDisplayName(rightBond.value)
 }
 
 onMounted(async () => {
@@ -214,7 +219,7 @@ onMounted(async () => {
   <section v-if="hasComparisonData" class="page compare-page">
     <div class="page-heading compact">
       <p class="eyebrow">채권 비교</p>
-      <h1 class="compare-title">{{ leftBond.shortName }} vs {{ rightBond.shortName }}</h1>
+      <h1 class="compare-title">{{ compareTitle }}</h1>
       <p>현재 ERD 기준의 발행정보, 시장 데이터, 이자 조건, 옵션 행사 정보를 나란히 비교합니다.</p>
     </div>
 
@@ -280,8 +285,8 @@ onMounted(async () => {
       <div class="compare-table professional-compare">
         <div class="compare-row header">
           <span>항목</span>
-          <strong>{{ leftBond.shortName }}</strong>
-          <strong>{{ rightBond.shortName }}</strong>
+          <strong>{{ bondDisplayName(leftBond) }}</strong>
+          <strong>{{ bondDisplayName(rightBond) }}</strong>
         </div>
         <div v-for="item in section.rows" :key="`${section.title}-${item.label}`" class="compare-row">
           <span>{{ item.label }}</span>
@@ -326,9 +331,9 @@ onMounted(async () => {
 
 .compare-summary-card {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 18px;
-  align-items: end;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
   padding: 22px;
 }
 
@@ -344,6 +349,9 @@ onMounted(async () => {
 .compare-summary-card h2 {
   margin: 8px 0;
   font-size: 22px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
 }
 
 .compare-summary-card p {
@@ -352,9 +360,16 @@ onMounted(async () => {
 
 .compare-summary-card dl {
   display: grid;
-  grid-template-columns: repeat(3, minmax(86px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   margin: 0;
+}
+
+.compare-summary-card dl > div {
+  min-width: 0;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--surface-soft);
 }
 
 .compare-summary-card dt,
@@ -365,8 +380,11 @@ onMounted(async () => {
 .compare-summary-card dd {
   margin-top: 4px;
   color: var(--primary-dark);
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .judgement-grid {
@@ -510,13 +528,15 @@ onMounted(async () => {
 }
 
 .professional-compare .compare-row {
-  grid-template-columns: 0.7fr 1fr 1fr;
+  grid-template-columns: minmax(120px, 0.7fr) minmax(0, 1fr) minmax(0, 1fr);
   min-height: 54px;
   align-items: center;
 }
 
 .compare-row span,
 .compare-row strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
   word-break: keep-all;
 }
 

@@ -1,31 +1,20 @@
 import { cachedQuery } from './cache'
 import { apiGet } from './client'
 
-export function getBonds() {
-  return []
-}
-
 export function fetchBonds() {
   return cachedQuery('bonds:list', async () => {
     try {
       const data = await apiGet('/bonds')
-      const items = getItems(data)
-      return items.map(normalizeBond)
+      return getItems(data).map(normalizeBond)
     } catch {
       return []
     }
   })
 }
 
-export function getSelectedBond() {
-  return null
-}
-
 export function fetchBondDetail(bondId) {
   return cachedQuery(`bonds:detail:${bondId}`, async () => {
-    if (!bondId) {
-      return null
-    }
+    if (!bondId) return null
 
     try {
       const data = await apiGet(`/bonds/${bondId}`)
@@ -40,9 +29,7 @@ export function fetchBondCompare(ids) {
   const compareIds = Array.isArray(ids) ? ids.slice(0, 2) : []
 
   return cachedQuery(`bonds:compare:${compareIds.join(',')}`, async () => {
-    if (compareIds.length !== 2) {
-      return []
-    }
+    if (compareIds.length !== 2) return []
 
     try {
       const data = await apiGet('/bonds/compare', { params: { ids: compareIds } })
@@ -71,38 +58,38 @@ function normalizeBond(item) {
   const market = item?.latest_market_data || item?.market_data || item || {}
   const issuer = basic.issuer || item?.issuer || {}
   const industry = issuer.industry || item?.industry || {}
-  const paymentCycleMonths = interest.payment_cycle_months
+  const paymentCycleMonths =
+    interest.payment_cycle_months
     || item?.payment_cycle_months
     || interest.interest_payment_unit_months
     || item?.interest_payment_unit_months
 
   return {
-    ...base,
     bondId: normalizeId(basic.bond_id || item?.bond_id || item?.id || base.bondId),
     name: basic.bond_name || item?.bond_name || base.name,
-    shortName: basic.short_name || item?.short_name || base.shortName,
+    shortName: basic.short_name || item?.short_name || basic.bond_name || item?.bond_name || base.shortName,
     code: basic.isin_code || item?.isin_code || base.code,
-    shortCode: basic.short_code || item?.short_code || base.shortCode,
+    shortCode: basic.short_code || item?.short_code || '',
     issuer: issuer.issuer_name || basic.issuer_name || item?.issuer_name || base.issuer,
     industry: industry.industry_name || basic.industry_name || item?.industry_name || base.industry,
     type: valueOrName(basic.bond_type || item?.bond_type, base.type),
-    price: formatNumber(market.price, base.price),
+    price: formatNumber(market.price, '시세 없음'),
     priceValue: toNumber(market.price, base.priceValue),
-    substitutePrice: formatNumber(market.substitute_price, base.substitutePrice),
-    change: formatPercent(market.price_change_rate, base.change, true),
+    substitutePrice: formatNumber(market.substitute_price, '시세 없음'),
+    change: formatPercent(market.price_change_rate, '시세 없음', true),
     priceChangeRate: toNumber(market.price_change_rate, base.priceChangeRate),
-    volume: formatCompactAmount(market.trading_volume, base.volume),
+    volume: formatCompactAmount(market.trading_volume, '시세 없음'),
     tradingVolume: toNumber(market.trading_volume, base.tradingVolume),
-    buyYield: formatPercent(market.bid_yield, base.buyYield),
+    buyYield: formatPercent(market.bid_yield, '시세 없음'),
     yieldValue: toNumber(market.bid_yield, base.yieldValue),
-    sellYield: formatPercent(market.ask_yield, base.sellYield),
-    ytm: formatPercent(market.ytm, base.ytm),
-    duration: formatYears(market.duration, base.duration),
+    sellYield: formatPercent(market.ask_yield, '시세 없음'),
+    ytm: formatPercent(market.ytm, '시세 없음'),
+    duration: formatYears(market.duration, '시세 없음'),
     durationValue: toNumber(market.duration, base.durationValue),
     rating: valueOrName(item?.credit_rating || basic.credit_rating, base.rating),
     ratingGroup: valueOrName(item?.rating_group || basic.rating_group, base.ratingGroup),
     issueDate: issue.issue_date || item?.issue_date || base.issueDate,
-    listingDate: issue.listing_date || item?.listing_date || base.listingDate,
+    listingDate: issue.listing_date || item?.listing_date || issue.issue_date || item?.issue_date || base.listingDate,
     maturity: formatDate(issue.maturity_date || item?.maturity_date, base.maturity),
     maturityDate: issue.maturity_date || item?.maturity_date || base.maturityDate,
     maturityYears: toMaturityYears(issue.maturity_date || item?.maturity_date, base.maturityYears),
@@ -167,9 +154,7 @@ function formatPercent(value, fallback = '-', showSign = false) {
   if (value === null || value === undefined || value === '') return fallback
   const number = Number(value)
 
-  if (!Number.isFinite(number)) {
-    return String(value)
-  }
+  if (!Number.isFinite(number)) return String(value)
 
   const sign = showSign && number > 0 ? '+' : ''
   return `${sign}${number.toFixed(2)}%`
@@ -178,9 +163,7 @@ function formatPercent(value, fallback = '-', showSign = false) {
 function formatCompactAmount(value, fallback = '-') {
   const number = Number(value)
 
-  if (!Number.isFinite(number)) {
-    return fallback
-  }
+  if (!Number.isFinite(number)) return fallback
 
   if (number >= 100000000) {
     return `${(number / 100000000).toFixed(1)}억`
@@ -191,7 +174,8 @@ function formatCompactAmount(value, fallback = '-') {
 
 function formatYears(value, fallback = '-') {
   if (value === null || value === undefined || value === '') return fallback
-  return `${Number(value).toFixed(2)}년`
+  const number = Number(value)
+  return Number.isFinite(number) ? `${number.toFixed(2)}년` : fallback
 }
 
 function formatMonthCycle(value, fallback = '-') {
@@ -211,9 +195,7 @@ function toMaturityYears(value, fallback) {
 }
 
 function normalizeOptionExercise(option, fallback) {
-  if (!option || Object.keys(option).length === 0) {
-    return fallback
-  }
+  if (!option || Object.keys(option).length === 0) return fallback
 
   return {
     startDate1: option.exercise_start_date_1 || option.start_date_1 || option.next_exercise_date || option.startDate1 || '',
