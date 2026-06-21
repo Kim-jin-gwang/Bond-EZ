@@ -6,6 +6,19 @@ def serialize_provider(provider):
 
 
 def serialize_news_list_item(news):
+    if isinstance(news.source, str):
+        return {
+            "news_id": news.id,
+            "source": {
+                "provider_id": None,
+                "provider_name": news.source,
+            },
+            "title": news.title,
+            "url": news.url,
+            "summary": "",
+            "published_at": news.write_date.isoformat() if news.write_date else None,
+        }
+
     return {
         "news_id": news.id,
         "source": serialize_provider(news.source),
@@ -18,6 +31,6 @@ def serialize_news_list_item(news):
 
 def serialize_news_detail(news):
     data = serialize_news_list_item(news)
-    data["content"] = news.content
+    data["content"] = getattr(news, "content", "") or data.get("summary", "")
     return data
 

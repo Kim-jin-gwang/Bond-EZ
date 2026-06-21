@@ -2,13 +2,15 @@ from django.db import models
 
 
 class GlossaryCategory(models.Model):
+    id = models.BigIntegerField(primary_key=True, db_column="category_id")
     category_name = models.CharField(max_length=50)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     deleted_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        db_table = "glossary_category"
+        managed = False
+        db_table = '"GlossaryCategory"'
         indexes = [models.Index(fields=["category_name"])]
 
     def __str__(self):
@@ -21,6 +23,7 @@ class Glossary(models.Model):
         MEDIUM = "MEDIUM", "보통"
         HARD = "HARD", "어려움"
 
+    id = models.BigIntegerField(primary_key=True, db_column="term_id")
     category = models.ForeignKey(GlossaryCategory, on_delete=models.PROTECT, related_name="terms")
     term_name = models.CharField(max_length=255)
     difficulty = models.CharField(max_length=20, choices=Difficulty.choices, default=Difficulty.EASY)
@@ -31,7 +34,8 @@ class Glossary(models.Model):
     deleted_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        db_table = "glossary"
+        managed = False
+        db_table = '"Glossary"'
         indexes = [
             models.Index(fields=["term_name"]),
             models.Index(fields=["category"]),
@@ -40,4 +44,3 @@ class Glossary(models.Model):
 
     def __str__(self):
         return self.term_name
-

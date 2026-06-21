@@ -183,3 +183,32 @@ class BondMarketData(TimeStampedSoftDeleteModel):
             models.Index(fields=["ytm"]),
             models.Index(fields=["trading_volume"]),
         ]
+
+
+class BondsMaster(models.Model):
+    isin_code = models.CharField(max_length=255, primary_key=True)
+    bond_name = models.CharField(max_length=255)
+    company_id = models.CharField(max_length=255, blank=True, null=True)
+    company_name = models.CharField(max_length=255, blank=True, null=True)
+    industry = models.CharField(max_length=255, blank=True, null=True)
+    issue_date = models.DateField(null=True, blank=True)
+    maturity_date = models.DateField(null=True, blank=True)
+    coupon_rate = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)
+    issue_amount = models.BigIntegerField(null=True, blank=True)
+    bond_type = models.CharField(max_length=255, blank=True, null=True)
+    seniority = models.CharField(max_length=255, blank=True, null=True)
+    call_put_option = models.CharField(max_length=255, blank=True, null=True)
+    interest_type = models.CharField(max_length=255, blank=True, null=True)
+    payment_cycle = models.CharField(max_length=255, blank=True, null=True)
+    guarantee_status = models.CharField(max_length=255, blank=True, null=True)
+    underwriter = models.CharField(max_length=255, blank=True, null=True)
+    credit_rating = models.CharField(max_length=255, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = "bonds_master"
+        indexes = [
+            models.Index(fields=["bond_name"]),
+            models.Index(fields=["company_name"]),
+            models.Index(fields=["maturity_date"]),
+        ]

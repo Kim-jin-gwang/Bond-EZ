@@ -37,3 +37,19 @@ class News(models.Model):
     def __str__(self):
         return self.title
 
+
+class NewsArticle(models.Model):
+    id = models.IntegerField(primary_key=True)
+    title = models.CharField(max_length=255)
+    source = models.CharField(max_length=255, blank=True, null=True)
+    url = models.URLField(max_length=500, blank=True, null=True)
+    write_date = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        managed = False
+        db_table = "news_article"
+        indexes = [
+            models.Index(fields=["write_date"]),
+            models.Index(fields=["title"]),
+        ]
