@@ -1,14 +1,19 @@
 import { cachedQuery } from './cache'
 import { apiGet } from './client'
 
-export function fetchBonds() {
-  return cachedQuery('bonds:list', async () => {
-    try {
-      const data = await apiGet('/bonds')
-      return getItems(data).map(normalizeBond)
-    } catch {
-      return []
-    }
+export const BOND_PAGE_SIZE = 20
+
+export function fetchBonds(params = {}) {
+  const requestParams = {
+    ...params,
+    page: params.page || 1,
+    size: params.size || BOND_PAGE_SIZE,
+  }
+  const cacheKey = `bonds:list:${JSON.stringify(requestParams)}`
+
+  return cachedQuery(cacheKey, async () => {
+    const payload = await apiGet('/bonds', { params: requestParams, raw: true })
+    return normalizePaginatedResponse(payload, normalizeBond)
   })
 }
 
@@ -43,10 +48,26 @@ export function fetchBondCompare(ids) {
 
 function getItems(data) {
   if (Array.isArray(data)) return data
+  if (Array.isArray(data?.data)) return data.data
   if (Array.isArray(data?.items)) return data.items
   if (Array.isArray(data?.results)) return data.results
   if (Array.isArray(data?.bonds)) return data.bonds
   return []
+}
+
+function normalizePaginatedResponse(payload, normalizer) {
+  const items = getItems(payload)
+  const page = payload?.page || {}
+
+  return {
+    items: items.map(normalizer),
+    page: {
+      number: page.number || 1,
+      size: page.size || items.length,
+      totalElements: page.total_elements ?? items.length,
+      totalPages: page.total_pages || 1,
+    },
+  }
 }
 
 function normalizeBond(item) {

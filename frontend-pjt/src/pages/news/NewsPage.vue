@@ -1,32 +1,38 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
-import { fetchNews } from '../../api/news'
+import { computed, onMounted, ref, watch } from 'vue'
+import { NEWS_PAGE_SIZE, fetchNews, fetchNewsProviders } from '../../api/news'
+import { useDebouncedRef } from '../../composables/useDebouncedRef'
 
-const keyword = ref('')
-const selectedPublisher = ref('전체')
+const keywordInput = ref('')
+const keyword = useDebouncedRef(keywordInput)
+const selectedPublisher = ref('')
 const selectedDate = ref('')
 const openedSummaryId = ref(null)
 const remoteNewsItems = ref([])
+const providers = ref([])
+const isLoading = ref(false)
+const error = ref(null)
+const currentPage = ref(1)
+const pageInfo = ref({
+  number: 1,
+  size: NEWS_PAGE_SIZE,
+  totalElements: 0,
+  totalPages: 1,
+})
+let requestId = 0
 
-const publishers = computed(() => ['전체', ...new Set(remoteNewsItems.value.map((item) => item.publisher).filter(Boolean))])
+const pageButtons = computed(() => getPageButtons(currentPage.value, pageInfo.value.totalPages))
 
-const filteredNews = computed(() => {
-  const normalizedKeyword = keyword.value.trim().toLowerCase()
-
-  return remoteNewsItems.value.filter((item) => {
-    const title = String(item.title || '').toLowerCase()
-    const publisher = String(item.publisher || '').toLowerCase()
-    const matchesKeyword = !normalizedKeyword || title.includes(normalizedKeyword) || publisher.includes(normalizedKeyword)
-    const matchesPublisher = selectedPublisher.value === '전체' || item.publisher === selectedPublisher.value
-    const matchesDate = !selectedDate.value || item.date === selectedDate.value
-
-    return matchesKeyword && matchesPublisher && matchesDate
-  })
+watch([keyword, selectedPublisher, selectedDate], () => {
+  currentPage.value = 1
+  loadNews()
 })
 
+watch(currentPage, loadNews)
+
 function resetFilters() {
-  keyword.value = ''
-  selectedPublisher.value = '전체'
+  keywordInput.value = ''
+  selectedPublisher.value = ''
   selectedDate.value = ''
   openedSummaryId.value = null
 }
@@ -35,8 +41,56 @@ function toggleSummary(id) {
   openedSummaryId.value = openedSummaryId.value === id ? null : id
 }
 
+async function loadNews() {
+  const activeRequest = ++requestId
+  isLoading.value = true
+  error.value = null
+
+  try {
+    const result = await fetchNews(buildNewsParams())
+    if (activeRequest !== requestId) return
+    remoteNewsItems.value = result.items
+    pageInfo.value = result.page
+    currentPage.value = result.page.number
+  } catch (err) {
+    if (activeRequest !== requestId) return
+    error.value = err
+  } finally {
+    if (activeRequest === requestId) {
+      isLoading.value = false
+    }
+  }
+}
+
+function buildNewsParams() {
+  return {
+    page: currentPage.value,
+    size: NEWS_PAGE_SIZE,
+    keyword: keyword.value.trim(),
+    provider_id: selectedPublisher.value,
+    published_from: selectedDate.value,
+    published_to: selectedDate.value,
+  }
+}
+
+function goToPage(page) {
+  if (page < 1 || page > pageInfo.value.totalPages || page === currentPage.value) return
+  currentPage.value = page
+}
+
+function getPageButtons(page, totalPages) {
+  const safeTotal = Math.max(1, totalPages || 1)
+  const start = Math.max(1, Math.min(page - 2, safeTotal - 4))
+  const end = Math.min(safeTotal, start + 4)
+  return Array.from({ length: end - start + 1 }, (_, index) => start + index)
+}
+
 onMounted(async () => {
-  remoteNewsItems.value = await fetchNews()
+  const [providerItems] = await Promise.all([
+    fetchNewsProviders(),
+    loadNews(),
+  ])
+  providers.value = providerItems
 })
 </script>
 
@@ -51,13 +105,14 @@ onMounted(async () => {
     <section class="news-filter-panel" aria-label="뉴스 필터">
       <label>
         <span>제목 검색</span>
-        <input v-model="keyword" type="search" placeholder="뉴스 제목 또는 뉴스사를 검색하세요" />
+        <input v-model="keywordInput" type="search" placeholder="뉴스 제목 또는 뉴스사를 검색하세요" />
       </label>
       <label>
         <span>뉴스사</span>
         <select v-model="selectedPublisher">
-          <option v-for="publisher in publishers" :key="publisher" :value="publisher">
-            {{ publisher }}
+          <option value="">전체</option>
+          <option v-for="publisher in providers" :key="publisher.id" :value="publisher.id">
+            {{ publisher.name }}
           </option>
         </select>
       </label>
@@ -70,11 +125,20 @@ onMounted(async () => {
 
     <section class="news-list-panel">
       <div class="news-list-header">
-        <span>총 {{ filteredNews.length }}건</span>
+        <span>총 {{ pageInfo.totalElements }}건</span>
         <strong>금리 관련 뉴스</strong>
       </div>
 
-      <article v-for="item in filteredNews" :key="item.id" class="rate-news-item">
+      <div v-if="isLoading" class="news-empty">
+        <p>뉴스를 불러오는 중입니다.</p>
+      </div>
+
+      <div v-if="error" class="news-empty error-state">
+        <p>뉴스를 불러오지 못했습니다.</p>
+        <button type="button" @click="loadNews">다시 시도</button>
+      </div>
+
+      <article v-for="item in remoteNewsItems" :key="item.id" class="rate-news-item">
         <div class="news-row">
           <div class="news-main">
             <span class="news-title">{{ item.title }}</span>
@@ -97,9 +161,23 @@ onMounted(async () => {
         </div>
       </article>
 
-      <div v-if="filteredNews.length === 0" class="news-empty">
+      <div v-if="!isLoading && !error && remoteNewsItems.length === 0" class="news-empty">
         <p>조건에 맞는 뉴스가 없습니다.</p>
         <button type="button" @click="resetFilters">필터 초기화</button>
+      </div>
+
+      <div v-if="pageInfo.totalPages > 1" class="pagination">
+        <button type="button" :disabled="currentPage === 1" @click="goToPage(currentPage - 1)">이전</button>
+        <button
+          v-for="page in pageButtons"
+          :key="page"
+          type="button"
+          :class="{ active: currentPage === page }"
+          @click="goToPage(page)"
+        >
+          {{ page }}
+        </button>
+        <button type="button" :disabled="currentPage >= pageInfo.totalPages" @click="goToPage(currentPage + 1)">다음</button>
       </div>
     </section>
   </section>
@@ -266,6 +344,40 @@ onMounted(async () => {
 
 .news-empty p {
   margin-bottom: 0;
+}
+
+.error-state {
+  border-color: #f2c7c7;
+  background: #fff7f7;
+}
+
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 18px;
+}
+
+.pagination button {
+  min-width: 38px;
+  min-height: 38px;
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  padding: 0 14px;
+  color: var(--primary);
+  background: white;
+  font-weight: 800;
+}
+
+.pagination button.active {
+  color: white;
+  background: var(--primary);
+}
+
+.pagination button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 @media (max-width: 900px) {

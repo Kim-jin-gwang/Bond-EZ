@@ -166,7 +166,7 @@ onMounted(async () => {
     fetchIndicators(),
   ])
 
-  bonds.value = remoteBonds
+  bonds.value = remoteBonds.items || []
   indicators.value = remoteIndicators
 })
 </script>

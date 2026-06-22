@@ -26,6 +26,10 @@ export async function apiGet(path, options = {}) {
     throw new ApiError(payload?.message || response.statusText || 'API request failed', response, payload)
   }
 
+  if (options.raw) {
+    return payload
+  }
+
   return payload?.data ?? payload
 }
 

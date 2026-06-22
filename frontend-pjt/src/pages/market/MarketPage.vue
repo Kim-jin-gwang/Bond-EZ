@@ -1,18 +1,8 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
-import { fetchBonds } from '../../api/bonds'
-import { useAsyncData } from '../../composables/useAsyncData'
-import { createEmptyBondFilters, useBondFilter } from '../../composables/useBondFilter'
+import { computed, onMounted, ref, watch } from 'vue'
+import { BOND_PAGE_SIZE, fetchBonds } from '../../api/bonds'
+import { createEmptyBondFilters } from '../../composables/useBondFilter'
 import { useDebouncedRef } from '../../composables/useDebouncedRef'
-
-const {
-  data: bonds,
-  isLoading,
-  error,
-  execute: reloadBonds,
-} = useAsyncData(fetchBonds, {
-  initialData: [],
-})
 
 const emit = defineEmits(['navigate'])
 
@@ -27,11 +17,21 @@ const filtersOpen = ref(false)
 const searchInput = ref(props.marketSearch?.keyword || '')
 const searchKeyword = useDebouncedRef(searchInput)
 const selectedBondCodes = ref([])
-const visibleLimit = ref(50)
 const selectedFilters = ref({
   ...createEmptyBondFilters(),
   ...props.marketSearch?.filters,
 })
+const bonds = ref([])
+const isLoading = ref(false)
+const error = ref(null)
+const currentPage = ref(1)
+const pageInfo = ref({
+  number: 1,
+  size: BOND_PAGE_SIZE,
+  totalElements: 0,
+  totalPages: 1,
+})
+let requestId = 0
 
 const filterGroups = [
   { key: 'bondTypes', label: '채권 종류', options: ['국채', '회사채', '금융채'] },
@@ -68,21 +68,22 @@ watch(() => props.marketSearch, (newVal) => {
   }
 }, { deep: true })
 
+const visibleBonds = computed(() => bonds.value)
+const pageButtons = computed(() => getPageButtons(currentPage.value, pageInfo.value.totalPages))
+
 watch([searchKeyword, selectedFilters], () => {
-  visibleLimit.value = 50
+  currentPage.value = 1
+  loadBonds()
 }, { deep: true })
 
-const { filteredBonds } = useBondFilter(bonds, searchKeyword, selectedFilters)
-const visibleBonds = computed(() => filteredBonds.value.slice(0, visibleLimit.value))
-const hasMoreBonds = computed(() => visibleBonds.value.length < filteredBonds.value.length)
+watch(currentPage, () => {
+  selectedBondCodes.value = []
+  loadBonds()
+})
 
 function resetFilters() {
   searchInput.value = ''
   selectedFilters.value = createEmptyBondFilters()
-}
-
-function showMoreBonds() {
-  visibleLimit.value += 50
 }
 
 function isBondSelected(code) {
@@ -115,6 +116,65 @@ function compareSelectedBonds() {
   })
 }
 
+async function loadBonds() {
+  const activeRequest = ++requestId
+  isLoading.value = true
+  error.value = null
+
+  try {
+    const result = await fetchBonds(buildBondParams())
+    if (activeRequest !== requestId) return
+    bonds.value = result.items
+    pageInfo.value = result.page
+    currentPage.value = result.page.number
+  } catch (err) {
+    if (activeRequest !== requestId) return
+    error.value = err
+  } finally {
+    if (activeRequest === requestId) {
+      isLoading.value = false
+    }
+  }
+}
+
+function reloadBonds() {
+  loadBonds()
+}
+
+function buildBondParams() {
+  const filters = selectedFilters.value
+  const params = {
+    page: currentPage.value,
+    size: BOND_PAGE_SIZE,
+    keyword: searchKeyword.value.trim(),
+  }
+
+  if (filters.bondTypes.length === 1) params.bond_type = filters.bondTypes[0]
+  if (filters.ratings.length === 1) params.rating_group = filters.ratings[0]
+  if (filters.optionTypes.length === 1) params.option_type = filters.optionTypes[0]
+  if (filters.seniorities.length === 1) params.seniority = filters.seniorities[0]
+  if (filters.interestCycles.length === 1) {
+    params.payment_cycle_months = Number(filters.interestCycles[0].replace(/[^0-9]/g, '')) || undefined
+  }
+  if (filters.yields.length === 1) {
+    params.min_ytm = Number(filters.yields[0].replace(/[^0-9.]/g, '')) || undefined
+  }
+
+  return params
+}
+
+function goToPage(page) {
+  if (page < 1 || page > pageInfo.value.totalPages || page === currentPage.value) return
+  currentPage.value = page
+}
+
+function getPageButtons(page, totalPages) {
+  const safeTotal = Math.max(1, totalPages || 1)
+  const start = Math.max(1, Math.min(page - 2, safeTotal - 4))
+  const end = Math.min(safeTotal, start + 4)
+  return Array.from({ length: end - start + 1 }, (_, index) => start + index)
+}
+
 function formatOptionLabel(option) {
   const label = String(option || '').trim()
 
@@ -123,6 +183,8 @@ function formatOptionLabel(option) {
   if (label.includes('없음')) return '없음'
   return label
 }
+
+onMounted(loadBonds)
 </script>
 
 <template>
@@ -160,7 +222,7 @@ function formatOptionLabel(option) {
     <div class="toolbar market-toolbar">
       <div class="market-info">
         <p class="eyebrow">전체 채권 시세</p>
-        <h1 aria-live="polite">{{ filteredBonds.length }}개의 채권이 검색되었습니다</h1>
+        <h1 aria-live="polite">{{ pageInfo.totalElements }}개의 채권이 검색되었습니다</h1>
         <p class="selection-help">비교할 채권을 최대 2개까지 선택하세요. 현재 {{ selectedBondCodes.length }}/2개 선택</p>
       </div>
       <button
@@ -241,7 +303,7 @@ function formatOptionLabel(option) {
             </td>
             <td class="action-cell"><button class="small-action" type="button" @click="$emit('navigate', 'detail', { bond })">상세정보</button></td>
           </tr>
-          <tr v-if="!isLoading && filteredBonds.length === 0">
+          <tr v-if="!isLoading && visibleBonds.length === 0">
             <td colspan="10" class="empty-cell">
               <div class="empty-msg">
                 <p>조건에 맞는 채권이 없습니다.</p>
@@ -253,10 +315,18 @@ function formatOptionLabel(option) {
       </table>
     </div>
 
-    <div v-if="hasMoreBonds" class="more-results">
-      <button type="button" @click="showMoreBonds">
-        {{ filteredBonds.length - visibleBonds.length }}개 더 보기
+    <div v-if="pageInfo.totalPages > 1" class="pagination">
+      <button type="button" :disabled="currentPage === 1" @click="goToPage(currentPage - 1)">이전</button>
+      <button
+        v-for="page in pageButtons"
+        :key="page"
+        type="button"
+        :class="{ active: currentPage === page }"
+        @click="goToPage(page)"
+      >
+        {{ page }}
       </button>
+      <button type="button" :disabled="currentPage >= pageInfo.totalPages" @click="goToPage(currentPage + 1)">다음</button>
     </div>
   </section>
 </template>
@@ -304,7 +374,7 @@ function formatOptionLabel(option) {
 }
 
 .error-state button,
-.more-results button {
+.pagination button {
   width: fit-content;
   min-height: 38px;
   border: 1px solid var(--primary);
@@ -452,10 +522,26 @@ tr.selected {
   font-weight: 600;
 }
 
-.more-results {
+.pagination {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   justify-content: center;
   margin-top: 18px;
+}
+
+.pagination button {
+  min-width: 38px;
+}
+
+.pagination button.active {
+  color: white;
+  background: var(--primary);
+}
+
+.pagination button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .price {

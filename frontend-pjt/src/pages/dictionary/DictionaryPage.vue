@@ -1,74 +1,95 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
-import { fetchGlossaryCategories, fetchGlossaryTerms } from '../../api/glossary'
+import { computed, onMounted, ref, watch } from 'vue'
+import { GLOSSARY_PAGE_SIZE, fetchGlossaryCategories, fetchGlossaryTerms } from '../../api/glossary'
+import { useDebouncedRef } from '../../composables/useDebouncedRef'
 
-const keyword = ref('')
+const keywordInput = ref('')
+const keyword = useDebouncedRef(keywordInput)
 const allCategoryLabel = '전체'
-const selectedCategory = ref(allCategoryLabel)
+const selectedCategory = ref('')
 const remoteTerms = ref([])
 const remoteCategories = ref([])
+const isLoading = ref(false)
+const error = ref(null)
+const currentPage = ref(1)
+const pageInfo = ref({
+  number: 1,
+  size: GLOSSARY_PAGE_SIZE,
+  totalElements: 0,
+  totalPages: 1,
+})
+let requestId = 0
 
 const activeTerms = computed(() => remoteTerms.value)
 
 const categories = computed(() => {
-  const categoryNames = remoteCategories.value.length
-    ? remoteCategories.value
-    : [...new Set(activeTerms.value.map((term) => term.category).filter(Boolean))]
-
-  return [allCategoryLabel, ...categoryNames]
+  return [
+    { id: '', name: allCategoryLabel },
+    ...remoteCategories.value,
+  ]
 })
 
-const filteredTerms = computed(() => {
-  const normalizedKeyword = normalizeSearchText(keyword.value)
+const pageButtons = computed(() => getPageButtons(currentPage.value, pageInfo.value.totalPages))
 
-  return activeTerms.value
-    .map((term, index) => ({
-      term,
-      index,
-      searchRank: getSearchRank(term, normalizedKeyword),
-    }))
-    .filter(({ term, searchRank }) => {
-      const matchesKeyword = !normalizedKeyword || searchRank > 0
-      const matchesCategory = selectedCategory.value === allCategoryLabel || term.category === selectedCategory.value
-
-      return matchesKeyword && matchesCategory
-    })
-    .sort((a, b) => {
-      if (!normalizedKeyword) return a.index - b.index
-      return a.searchRank - b.searchRank || a.index - b.index
-    })
-    .map(({ term }) => term)
+watch([keyword, selectedCategory], () => {
+  currentPage.value = 1
+  loadTerms()
 })
 
-function normalizeSearchText(value) {
-  return String(value || '').trim().toLowerCase()
-}
-
-function includesKeyword(value, normalizedKeyword) {
-  return normalizeSearchText(value).includes(normalizedKeyword)
-}
-
-function getSearchRank(term, normalizedKeyword) {
-  if (!normalizedKeyword) return 1
-  if (includesKeyword(term.term, normalizedKeyword)) return 1
-  if (includesKeyword(term.category, normalizedKeyword)) return 2
-  if (includesKeyword(term.level, normalizedKeyword)) return 3
-  if (includesKeyword(term.desc, normalizedKeyword)) return 4
-  if (includesKeyword(term.example, normalizedKeyword)) return 5
-  return 0
-}
+watch(currentPage, loadTerms)
 
 function resetSearch() {
-  keyword.value = ''
-  selectedCategory.value = allCategoryLabel
+  keywordInput.value = ''
+  selectedCategory.value = ''
+}
+
+async function loadTerms() {
+  const activeRequest = ++requestId
+  isLoading.value = true
+  error.value = null
+
+  try {
+    const result = await fetchGlossaryTerms(buildGlossaryParams())
+    if (activeRequest !== requestId) return
+    remoteTerms.value = result.items
+    pageInfo.value = result.page
+    currentPage.value = result.page.number
+  } catch (err) {
+    if (activeRequest !== requestId) return
+    error.value = err
+  } finally {
+    if (activeRequest === requestId) {
+      isLoading.value = false
+    }
+  }
+}
+
+function buildGlossaryParams() {
+  return {
+    page: currentPage.value,
+    size: GLOSSARY_PAGE_SIZE,
+    keyword: keyword.value.trim(),
+    category_id: selectedCategory.value,
+  }
+}
+
+function goToPage(page) {
+  if (page < 1 || page > pageInfo.value.totalPages || page === currentPage.value) return
+  currentPage.value = page
+}
+
+function getPageButtons(page, totalPages) {
+  const safeTotal = Math.max(1, totalPages || 1)
+  const start = Math.max(1, Math.min(page - 2, safeTotal - 4))
+  const end = Math.min(safeTotal, start + 4)
+  return Array.from({ length: end - start + 1 }, (_, index) => start + index)
 }
 
 onMounted(async () => {
-  const [items, categoryItems] = await Promise.all([
-    fetchGlossaryTerms(),
+  const [categoryItems] = await Promise.all([
     fetchGlossaryCategories(),
+    loadTerms(),
   ])
-  remoteTerms.value = items
   remoteCategories.value = categoryItems
 })
 </script>
@@ -84,18 +105,18 @@ onMounted(async () => {
     <section class="dictionary-toolbar" aria-label="용어 검색과 분류">
       <div class="dictionary-search">
         <span aria-hidden="true">⌕</span>
-        <input v-model="keyword" type="search" placeholder="궁금한 채권 용어를 검색하세요" />
+        <input v-model="keywordInput" type="search" placeholder="궁금한 채권 용어를 검색하세요" />
       </div>
 
       <div class="category-tabs" aria-label="용어 분류">
         <button
           v-for="category in categories"
-          :key="category"
-          :class="{ active: selectedCategory === category }"
+          :key="category.id || category.name"
+          :class="{ active: selectedCategory === category.id }"
           type="button"
-          @click="selectedCategory = category"
+          @click="selectedCategory = category.id"
         >
-          {{ category }}
+          {{ category.name }}
         </button>
       </div>
     </section>
@@ -103,11 +124,11 @@ onMounted(async () => {
     <section class="dictionary-summary">
       <article>
         <span>전체 용어</span>
-        <strong>{{ activeTerms.length }}개</strong>
+        <strong>{{ pageInfo.totalElements }}개</strong>
       </article>
       <article>
         <span>현재 표시</span>
-        <strong>{{ filteredTerms.length }}개</strong>
+        <strong>{{ activeTerms.length }}개</strong>
       </article>
       <article>
         <span>분류</span>
@@ -116,7 +137,16 @@ onMounted(async () => {
     </section>
 
     <section class="term-grid" aria-label="채권 용어 목록">
-      <article v-for="term in filteredTerms" :key="term.term" class="term-card dictionary-term-card">
+      <div v-if="isLoading" class="dictionary-empty">
+        <p>용어를 불러오는 중입니다.</p>
+      </div>
+
+      <div v-if="error" class="dictionary-empty error-state">
+        <p>용어를 불러오지 못했습니다.</p>
+        <button type="button" @click="loadTerms">다시 시도</button>
+      </div>
+
+      <article v-for="term in activeTerms" :key="term.id || term.term" class="term-card dictionary-term-card">
         <div class="term-card-header">
           <div>
             <span class="term-category">{{ term.category }}</span>
@@ -131,11 +161,25 @@ onMounted(async () => {
         </div>
       </article>
 
-      <div v-if="filteredTerms.length === 0" class="dictionary-empty">
+      <div v-if="!isLoading && !error && activeTerms.length === 0" class="dictionary-empty">
         <p>검색 조건에 맞는 용어가 없습니다.</p>
         <button type="button" @click="resetSearch">전체 용어 보기</button>
       </div>
     </section>
+
+    <div v-if="pageInfo.totalPages > 1" class="pagination">
+      <button type="button" :disabled="currentPage === 1" @click="goToPage(currentPage - 1)">이전</button>
+      <button
+        v-for="page in pageButtons"
+        :key="page"
+        type="button"
+        :class="{ active: currentPage === page }"
+        @click="goToPage(page)"
+      >
+        {{ page }}
+      </button>
+      <button type="button" :disabled="currentPage >= pageInfo.totalPages" @click="goToPage(currentPage + 1)">다음</button>
+    </div>
   </section>
 </template>
 
@@ -304,6 +348,40 @@ onMounted(async () => {
   color: var(--primary);
   background: white;
   font-weight: 800;
+}
+
+.error-state {
+  border-color: #f2c7c7;
+  background: #fff7f7;
+}
+
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.pagination button {
+  min-width: 38px;
+  min-height: 38px;
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  padding: 0 14px;
+  color: var(--primary);
+  background: white;
+  font-weight: 800;
+}
+
+.pagination button.active {
+  color: white;
+  background: var(--primary);
+}
+
+.pagination button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 @media (max-width: 820px) {
