@@ -85,6 +85,48 @@ services:
     networks:
       - de_net
 
+  # --- Hadoop (HDFS) ---
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: namenode
+    restart: always
+    ports:
+      - "9870:9870"
+      - "9000:9000"
+    volumes:
+      - ./data-pjt/hadoop_data/namenode:/hadoop/dfs/name
+    environment:
+      - CLUSTER_NAME=test
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+      - CORE_CONF_hadoop_http_staticuser_user=root
+      - CORE_CONF_hadoop_tmp_dir=/hadoop/tmp
+      - HDFS_CONF_dfs_webhdfs_enabled=true
+      - HDFS_CONF_dfs_permissions_enabled=false
+      - HDFS_CONF_dfs_replication=1
+    networks:
+      - de_net
+
+  datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode
+    restart: always
+    depends_on:
+      - namenode
+    ports:
+      - "9864:9864"
+    volumes:
+      - ./data-pjt/hadoop_data/datanode:/hadoop/dfs/data
+    environment:
+      - SERVICE_PRECONDITION=namenode:9870
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
+      - CORE_CONF_hadoop_http_staticuser_user=root
+      - CORE_CONF_hadoop_tmp_dir=/hadoop/tmp
+      - HDFS_CONF_dfs_webhdfs_enabled=true
+      - HDFS_CONF_dfs_permissions_enabled=false
+      - HDFS_CONF_dfs_replication=1
+    networks:
+      - de_net
+
   # --- Airflow (Optimized with LocalExecutor) ---
   airflow-webserver:
     build:
@@ -178,6 +220,7 @@ services:
       - "8082:8081"
     command: jobmanager
     environment:
+      - HADOOP_CLASSPATH=/opt/flink/hadoop/*
       - |
         FLINK_PROPERTIES=
         jobmanager.rpc.address: flink-jobmanager
@@ -194,6 +237,7 @@ services:
       - flink-jobmanager
     command: taskmanager
     environment:
+      - HADOOP_CLASSPATH=/opt/flink/hadoop/*
       - |
         FLINK_PROPERTIES=
         jobmanager.rpc.address: flink-jobmanager
@@ -210,6 +254,8 @@ services:
     restart: always
     depends_on:
       - kafka
+    env_file:
+      - .env
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
     volumes:
@@ -229,13 +275,10 @@ services:
       - db
     volumes:
       - ./data-pjt:/app
+    env_file:
+      - .env
     environment:
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
-      - POSTGRES_DB=bonds_db
-      - POSTGRES_USER=ssafyuser
-      - POSTGRES_PASSWORD=ssafy
-      - DB_HOST=db
-      - DB_PORT=5432
+      - HADOOP_CLASSPATH=/opt/flink/hadoop/*
     command: >
       bash -c "sleep 15 && flink run -m flink-jobmanager:8081 -py /app/flink/news_processor.py"
     networks:

@@ -28,6 +28,9 @@ data-pjt/airflow/dags/__pycache__/
 # PostgreSQL actual data
 data-pjt/postgres_data/
 
+# Hadoop actual data
+data-pjt/hadoop_data/
+
 # Python cache
 __pycache__/
 *.pyc

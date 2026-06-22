@@ -16,5 +16,10 @@ RUN wget https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-kaf
     wget https://repo1.maven.org/maven2/org/apache/flink/flink-connector-jdbc/3.1.2-1.18/flink-connector-jdbc-3.1.2-1.18.jar -P /opt/flink/lib/ && \
     wget https://repo1.maven.org/maven2/org/postgresql/postgresql/42.7.2/postgresql-42.7.2.jar -P /opt/flink/lib/
 
-RUN chmod 644 /opt/flink/lib/*.jar
+# Setup Hadoop shaded dependency in a dedicated directory to prevent class conflicts with Flink CLI
+RUN mkdir -p /opt/flink/hadoop && \
+    wget https://repo.maven.apache.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.8.3-10.0/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar -P /opt/flink/hadoop/
+
+RUN chmod 644 /opt/flink/lib/*.jar /opt/flink/hadoop/*.jar
 WORKDIR /opt/flink
+
