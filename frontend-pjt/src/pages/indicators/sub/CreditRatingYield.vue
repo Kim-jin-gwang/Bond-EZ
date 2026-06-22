@@ -14,19 +14,19 @@ defineProps({
     <header class="credit-board-header">
       <div>
         <p class="eyebrow">Credit Rating Rates</p>
-        <h2>신용등급 금리</h2>
-        <p>DB의 채권 시세 데이터를 기준으로 신용등급별 평균 수익률을 비교합니다.</p>
+        <h2>신용등급별 금리</h2>
+        <p>DB의 채권 발행 조건을 기준으로 신용등급별 평균 표면금리를 비교합니다.</p>
       </div>
     </header>
 
     <section class="credit-guide-grid" aria-label="신용등급 지표 해석 안내">
       <article>
         <strong>등급별 평균 금리</strong>
-        <p>같은 시점에서 신용등급별 평균 수익률을 비교합니다. 등급이 낮을수록 위험 보상 요구가 커질 수 있습니다.</p>
+        <p>신용등급별 채권의 표면금리 평균을 비교합니다. 등급이 낮을수록 발행 시 요구 금리가 높아질 수 있습니다.</p>
       </article>
       <article>
         <strong>채권 수</strong>
-        <p>평균 수익률 계산에 포함된 채권 수입니다. 표본 수가 적은 등급은 해석에 주의가 필요합니다.</p>
+        <p>평균 금리 계산에 포함된 채권 수입니다. 표본 수가 적은 등급은 해석에 주의가 필요합니다.</p>
       </article>
       <article>
         <strong>주의해서 볼 점</strong>

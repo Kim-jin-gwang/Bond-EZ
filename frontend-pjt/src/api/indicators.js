@@ -13,9 +13,9 @@ const INDICATOR_META = {
     insight: '기준금리 차이는 환율, 해외 금리, 국내 채권 금리에도 영향을 줄 수 있어 같이 보는 것이 좋습니다.',
   },
   'credit-rating-yield': {
-    shortTitle: '신용등급 금리',
-    summary: '신용등급별 평균 수익률을 비교해 등급별 위험 보상 수준을 확인합니다.',
-    insight: '등급이 낮을수록 수익률이 높아질 수 있지만, 발행사 재무 상태와 유동성도 함께 확인해야 합니다.',
+    shortTitle: '신용등급별 금리',
+    summary: '신용등급별 평균 표면금리를 비교해 등급별 채권 금리 수준을 확인합니다.',
+    insight: '표면금리는 발행 조건 기준 금리입니다. 실제 투자 수익률은 매수 가격, 잔존 만기, 유동성에 따라 달라질 수 있습니다.',
   },
   'deposit-compare': {
     shortTitle: '예금 비교',
@@ -138,7 +138,6 @@ function normalizeCreditRatingYield(base, rows) {
     row.credit_rating || row.rating_group || '-',
     formatPercent(row.average_ytm),
     `${row.bond_count ?? 0}건`,
-    '등급별 평균 수익률',
   ])
   const first = rows[0]
 
@@ -148,7 +147,7 @@ function normalizeCreditRatingYield(base, rows) {
     caption: first ? `${first.credit_rating} 기준` : '',
     chartType: 'bar',
     bars: barHeights(rows.map((row) => row.average_ytm)),
-    tableColumns: ['신용등급', '평균 금리', '채권 수', '해석'],
+    tableColumns: ['신용등급', '평균 금리', '채권 수'],
     tableRows,
     stats: rows.map((row) => ({ label: row.credit_rating || row.rating_group || '-', value: formatPercent(row.average_ytm) })),
   }
