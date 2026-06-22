@@ -2,12 +2,14 @@ from django.db import models
 
 
 class NewsProvider(models.Model):
+    id = models.BigIntegerField(primary_key=True, db_column="provider_id")
     provider_name = models.CharField(max_length=50)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     deleted_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
+        managed = False
         db_table = "news_provider"
         indexes = [models.Index(fields=["provider_name"])]
 
@@ -16,17 +18,23 @@ class NewsProvider(models.Model):
 
 
 class News(models.Model):
-    source = models.ForeignKey(NewsProvider, on_delete=models.PROTECT, related_name="news")
+    id = models.BigIntegerField(primary_key=True, db_column="news_id")
+    source = models.ForeignKey(
+        NewsProvider,
+        on_delete=models.PROTECT,
+        related_name="news",
+        db_column="source_id",
+    )
     title = models.CharField(max_length=255)
     url = models.URLField(max_length=500, unique=True)
     summary = models.TextField(blank=True)
-    content = models.TextField(blank=True)
     published_at = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     deleted_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
+        managed = False
         db_table = "news"
         indexes = [
             models.Index(fields=["published_at"]),

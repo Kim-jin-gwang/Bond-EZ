@@ -32,7 +32,6 @@ def filtered_news(params):
         queryset = queryset.filter(
             Q(title__icontains=keyword)
             | Q(summary__icontains=keyword)
-            | Q(content__icontains=keyword)
         )
 
     provider_id = params.get("provider_id")

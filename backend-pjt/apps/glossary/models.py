@@ -10,7 +10,7 @@ class GlossaryCategory(models.Model):
 
     class Meta:
         managed = False
-        db_table = '"GlossaryCategory"'
+        db_table = "glossary_category"
         indexes = [models.Index(fields=["category_name"])]
 
     def __str__(self):
@@ -35,7 +35,7 @@ class Glossary(models.Model):
 
     class Meta:
         managed = False
-        db_table = '"Glossary"'
+        db_table = "glossary"
         indexes = [
             models.Index(fields=["term_name"]),
             models.Index(fields=["category"]),

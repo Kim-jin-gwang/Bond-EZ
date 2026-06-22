@@ -1,5 +1,14 @@
 def number_or_none(value):
-    return None if value is None else float(value)
+    if value is None or value == "":
+        return None
+
+    if isinstance(value, str):
+        normalized = "".join(ch for ch in value if ch.isdigit() or ch in ".-")
+        if normalized in {"", ".", "-", "-."}:
+            return None
+        value = normalized
+
+    return float(value)
 
 
 def date_or_none(value):
