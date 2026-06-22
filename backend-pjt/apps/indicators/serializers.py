@@ -31,7 +31,7 @@ def serialize_deposit_rate(deposit_rate):
 
 
 def serialize_credit_rating_rate(row):
-    rating_name = row["bond__rating__rating_name"]
+    rating_name = row.get("rating__rating_name") or row["bond__rating__rating_name"]
     return {
         "credit_rating": rating_name,
         "rating_group": rating_name.rstrip("+-0123456789"),
