@@ -27,44 +27,158 @@ DB_PORT = os.getenv("DB_PORT", "5432")
 # --- 1. API 수집 함수 ---
 # ... (생략된 함수들은 동일함)
 def fetch_and_produce_bond_data():
+    import math
+    
+    # 1. DB에서 기존 적재된 isin_code 목록 조회
+    existing_codes = set()
+    try:
+        conn = psycopg2.connect(
+            host=DB_HOST,
+            port=DB_PORT,
+            database=POSTGRES_DB,
+            user=POSTGRES_USER,
+            password=POSTGRES_PASSWORD
+        )
+        cur = conn.cursor()
+        cur.execute('SELECT isin_code FROM bond;')
+        existing_codes = {row[0] for row in cur.fetchall() if row[0]}
+        cur.close()
+        conn.close()
+        print(f"Loaded {len(existing_codes)} existing bond codes from DB.")
+    except Exception as e:
+        print(f"Could not load existing bond codes (DB might be empty or table not created yet): {e}")
+
+    # 2. 공공데이터포털 API에서 최신 데이터가 존재하는 기준일자(basDt) 탐색
+    base_url = "http://apis.data.go.kr/1160100/GetBondIssuInfoService_V2/getBondBasiInfo_V2"
+    today = datetime.now()
+    target_date = None
+    total_count = 0
+    
+    # 최근 10일간을 탐색하여 데이터가 존재하는 가장 최신 날짜를 찾습니다.
+    for i in range(10):
+        check_date = (today - timedelta(days=i)).strftime("%Y%m%d")
+        test_url = f"{base_url}?serviceKey={API_KEY}&numOfRows=1&pageNo=1&resultType=json&basDt={check_date}"
+        try:
+            resp = requests.get(test_url, timeout=15)
+            if resp.status_code == 200:
+                resp_json = resp.json()
+                body = resp_json.get("response", {}).get("body", {})
+                count = body.get("totalCount", 0)
+                if count > 0:
+                    target_date = check_date
+                    total_count = count
+                    break
+        except Exception as e:
+            print(f"Error checking date {check_date}: {e}")
+            
+    if not target_date:
+        print("Error: Could not find any valid target date with bond data from API.")
+        return
+        
+    print(f"Target Date selected: {target_date} (Total API records: {total_count})")
+    
+    # 3. Kafka Producer 설정
     producer = KafkaProducer(
         bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
         value_serializer=lambda v: json.dumps(v, ensure_ascii=False).encode('utf-8'),
         acks='all'
     )
     topic = 'topic_bond_raw'
-    base_url = "http://apis.data.go.kr/1160100/GetBondIssuInfoService_V2/getBondBasiInfo_V2"
-    
-    total_count = 1000
     page_size = 100
-    total_pages = total_count // page_size
+    total_pages = math.ceil(total_count / page_size)
     
+    is_initial_load = len(existing_codes) == 0
+    mode_str = "Initial Load (Full)" if is_initial_load else "Daily Incremental"
+    print(f"Starting ingestion in {mode_str} mode...")
+    
+    sent_count = 0
     for page in range(1, total_pages + 1):
-        url = f"{base_url}?serviceKey={API_KEY}&numOfRows={page_size}&pageNo={page}&resultType=json"
+        url = f"{base_url}?serviceKey={API_KEY}&numOfRows={page_size}&pageNo={page}&resultType=json&basDt={target_date}"
         try:
-            print(f"Fetching page {page}...")
+            print(f"Fetching page {page}/{total_pages}...")
             response = requests.get(url, timeout=30)
             response.raise_for_status()
             data = response.json()
             items = data.get('response', {}).get('body', {}).get('items', {}).get('item', [])
             
-            if not items: break
+            if not items: 
+                break
+                
+            page_sent = 0
             for item in items:
-                producer.send(topic, item)
+                isin_cd = item.get('isinCd')
+                if not isin_cd:
+                    continue
+                # 초기 수집 모드이거나, DB에 존재하지 않는 신규 채권인 경우에만 Kafka로 전송
+                if is_initial_load or (isin_cd not in existing_codes):
+                    producer.send(topic, item)
+                    page_sent += 1
+                    sent_count += 1
+                    
             producer.flush()
-            print(f"Sent {len(items)} items from page {page} to Kafka.")
-            time.sleep(1)
+            if page_sent > 0:
+                print(f"Sent {page_sent} new items from page {page} to Kafka.")
+            time.sleep(0.5)  # API Rate limit 고려
         except Exception as e:
             print(f"Error at page {page}: {e}")
-            raise e  # Fail the task if API call fails
+            raise e
+            
     producer.close()
+    print(f"Bond ingestion completed. Total sent to Kafka: {sent_count} bonds.")
 
-# --- 2. Spark 가공 함수 ---
-def run_spark_bond_batch():
+# --- 2. Spark HDFS 및 RDB 가공 함수 ---
+def run_spark_kafka_to_hdfs():
     spark = SparkSession.builder \
-        .appName("Airflow-BondBatch") \
-        .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.4,org.postgresql:postgresql:42.7.2") \
+        .appName("Airflow-SparkKafkaToHDFS") \
+        .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.4") \
+        .config("spark.testing.memory", "471859200") \
         .getOrCreate()
+
+    # Kafka Topic에서 스트림 읽기
+    kafka_df = spark.readStream.format("kafka") \
+        .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVERS) \
+        .option("subscribe", "topic_bond_raw") \
+        .option("startingOffsets", "earliest") \
+        .option("allowNonExistentTopics", "true") \
+        .load()
+    
+    # Kafka의 value 컬럼은 binary 형식이므로 string으로 변환
+    raw_df = kafka_df.selectExpr("CAST(value AS STRING) as json_value")
+    
+    # json_value에서 basDt 추출하여 bas_dt 컬럼으로 추가 (HDFS 파티션용)
+    from pyspark.sql.functions import json_tuple
+    partitioned_raw_df = raw_df.select("json_value", json_tuple("json_value", "basDt").alias("bas_dt"))
+    
+    # HDFS /raw/bonds 경로에 parquet 형식으로 쓰기 (bas_dt 컬럼으로 파티션)
+    checkpoint_path = "hdfs://namenode:9000/spark/checkpoints/kafka_to_hdfs"
+    hdfs_raw_path = "hdfs://namenode:9000/raw/bonds"
+    
+    query = partitioned_raw_df.writeStream \
+        .format("parquet") \
+        .partitionBy("bas_dt") \
+        .trigger(availableNow=True) \
+        .option("checkpointLocation", checkpoint_path) \
+        .start(hdfs_raw_path)
+        
+    query.awaitTermination()
+    spark.stop()
+
+def run_spark_hdfs_to_postgres():
+    spark = SparkSession.builder \
+        .appName("Airflow-SparkHDFSToPostgres") \
+        .config("spark.jars.packages", "org.postgresql:postgresql:42.7.2") \
+        .config("spark.testing.memory", "471859200") \
+        .getOrCreate()
+        
+    # HDFS /raw/bonds에서 Parquet 읽기 (자동으로 bas_dt 파티션 컬럼 로드됨)
+    hdfs_raw_path = "hdfs://namenode:9000/raw/bonds"
+    
+    try:
+        raw_df = spark.read.parquet(hdfs_raw_path)
+    except Exception as e:
+        print(f"No parquet files found at HDFS raw directory (it might be the first run): {e}")
+        spark.stop()
+        return
 
     kafka_schema = StructType([
         StructField("isinCd", StringType()), StructField("isinCdNm", StringType()),
@@ -90,15 +204,9 @@ def run_spark_bond_batch():
             except: return len(rating_order)
         return max(ratings, key=rating_index)
 
-    raw_df = spark.readStream.format("kafka") \
-        .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVERS) \
-        .option("subscribe", "topic_bond_raw") \
-        .option("startingOffsets", "earliest") \
-        .option("allowNonExistentTopics", "true") \
-        .load()
-    parsed_df = raw_df.selectExpr("CAST(value AS STRING)").select(from_json(col("value"), kafka_schema).alias("data")).select("data.*")
+    parsed_df = raw_df.select(from_json(col("json_value"), kafka_schema).alias("data"), col("bas_dt")).select("data.*", "bas_dt")
 
-    final_df = parsed_df \
+    dw_df = parsed_df \
         .withColumn("isin_code", col("isinCd")) \
         .withColumn("bond_name", col("isinCdNm")) \
         .withColumn("company_id", col("crno")) \
@@ -116,40 +224,42 @@ def run_spark_bond_batch():
         .withColumn("guarantee_status", col("grnDcdNm")) \
         .withColumn("underwriter", col("bondUndtInstNm")) \
         .withColumn("credit_rating", get_lowest_rating(col("kisScrsItmsKcdNm"), col("kbpScrsItmsKcdNm"), col("niceScrsItmsKcdNm"), col("fnScrsItmsKcdNm"))) \
-        .select("isin_code", "bond_name", "company_id", "company_name", "industry", "issue_date", "maturity_date", "coupon_rate", "issue_amount", "bond_type", "seniority", "call_put_option", "interest_type", "payment_cycle", "guarantee_status", "underwriter", "credit_rating")
+        .select("isin_code", "bond_name", "company_id", "company_name", "industry", "issue_date", "maturity_date", "coupon_rate", "issue_amount", "bond_type", "seniority", "call_put_option", "interest_type", "payment_cycle", "guarantee_status", "underwriter", "credit_rating", "bas_dt")
+
+    deduped_df = dw_df.dropDuplicates(["isin_code"])
+
+    # HDFS /dw/bonds 경로에 정규화 DW 형태로 쓰기 (bas_dt 컬럼으로 파티션)
+    hdfs_dw_path = "hdfs://namenode:9000/dw/bonds"
+    deduped_df.write.mode("overwrite").partitionBy("bas_dt").parquet(hdfs_dw_path)
+    print("SUCCESS: Standardized DW Parquet loaded to HDFS /dw/bonds with partitioning.")
 
     JDBC_URL = f"jdbc:postgresql://{DB_HOST}:{DB_PORT}/{POSTGRES_DB}"
     JDBC_PROPERTIES = {"user": POSTGRES_USER, "password": POSTGRES_PASSWORD, "driver": "org.postgresql.Driver"}
-    CHECKPOINT_PATH = "/opt/airflow/dags/spark_checkpoints/bond_raw"
+    if DB_HOST != "db":
+        JDBC_PROPERTIES["ssl"] = "true"
+        JDBC_PROPERTIES["sslmode"] = "require"
 
-    def write_to_postgres_upsert(batch_df, batch_id):
-        # 마이크로 배치 DataFrame에서 중복 제거
-        deduped_df = batch_df.dropDuplicates(["isin_code"])
-        
-        # 임시 테이블에 쓰기 (Overwrite)
-        deduped_df.write.jdbc(url=JDBC_URL, table="temp_bonds_master_staging", mode="overwrite", properties=JDBC_PROPERTIES)
-        
-        # PostgreSQL Upsert 실행
-        conn = psycopg2.connect(host=DB_HOST, port=DB_PORT, database=POSTGRES_DB, user=POSTGRES_USER, password=POSTGRES_PASSWORD)
-        cur = conn.cursor()
-        try:
-            cur.execute("SELECT normalize_bonds_staging();")
-            cur.execute("DROP TABLE temp_bonds_master_staging;")
-            conn.commit()
-        except Exception as e:
-            conn.rollback()
-            raise e
-        finally:
-            cur.close()
-            conn.close()
+    # DB에 적재할 데이터프레임에서는 HDFS 파티션 컬럼(bas_dt) 제거
+    db_df = deduped_df.drop("bas_dt")
 
-    query = final_df.writeStream \
-        .foreachBatch(write_to_postgres_upsert) \
-        .trigger(availableNow=True) \
-        .option("checkpointLocation", CHECKPOINT_PATH) \
-        .start()
+    # 스테이징 테이블에 OVERWRITE 적재
+    db_df.write.jdbc(url=JDBC_URL, table="temp_bonds_master_staging", mode="overwrite", properties=JDBC_PROPERTIES)
 
-    query.awaitTermination()
+    # PostgreSQL Upsert 실행
+    conn = psycopg2.connect(host=DB_HOST, port=DB_PORT, database=POSTGRES_DB, user=POSTGRES_USER, password=POSTGRES_PASSWORD)
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT normalize_bonds_staging();")
+        cur.execute("DROP TABLE temp_bonds_master_staging;")
+        conn.commit()
+        print("SUCCESS: PostgreSQL DB load complete!")
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        cur.close()
+        conn.close()
+
     spark.stop()
 
 # Helper functions for types and date addition
@@ -185,8 +295,8 @@ def ingest_option_cashflow_details():
     # 1. 상세 정보가 비어 있는 채권 조회 (최대 100건만 점진적으로 처리하여 API 호출 횟수 조절)
     cur.execute("""
         SELECT b.isin_code, b.issue_date, b.maturity_date, b.payment_cycle_months, b.option_type, b.interest_type, b.cashflow_rule_id, b.option_exercise_id
-        FROM "Bond" b
-        JOIN "BondCashflowRule" c ON b.cashflow_rule_id = c.cashflow_rule_id
+        FROM bond b
+        JOIN bond_cashflow_rule c ON b.cashflow_rule_id = c.cashflow_rule_id
         WHERE c.first_interest_payment_date IS NULL
         LIMIT 100;
     """)
@@ -389,7 +499,7 @@ def ingest_option_cashflow_details():
             
             # 이자지급조건 업데이트 (결측치에 한해 Fallback 적용)
             cur.execute("""
-                UPDATE "BondCashflowRule" SET
+                UPDATE bond_cashflow_rule SET
                     interest_payment_method = %s,
                     interest_payment_unit_months = %s,
                     interest_calculation_months = %s,
@@ -419,7 +529,7 @@ def ingest_option_cashflow_details():
             default_reason = "투자자/발행인 선택에 의한 조기상환 권리 행사" if has_option else None
             
             cur.execute("""
-                UPDATE "BondOptionExercise" SET
+                UPDATE bond_option_exercise SET
                     option_type = %s,
                     exercise_start_date_1 = %s,
                     exercise_end_date_1 = %s,
@@ -441,8 +551,8 @@ def ingest_option_cashflow_details():
             # 마스터 테이블 옵션 싱크
             if api_option_type != option_type:
                 cur.execute("""
-                    UPDATE "Bond" SET option_type = %s, updated_at = CURRENT_TIMESTAMP WHERE bond_id = (
-                        SELECT bond_id FROM "Bond" WHERE isin_code = %s
+                    UPDATE bond SET option_type = %s, updated_at = CURRENT_TIMESTAMP WHERE bond_id = (
+                        SELECT bond_id FROM bond WHERE isin_code = %s
                     );
                 """, (api_option_type, isin_code))
                 
@@ -453,7 +563,7 @@ def ingest_option_cashflow_details():
             pre_post_type = "선급" if interest_type == "할인채" else "후급"
             
             cur.execute("""
-                UPDATE "BondCashflowRule" SET
+                UPDATE bond_cashflow_rule SET
                     interest_payment_method = %s,
                     interest_payment_unit_months = %s,
                     interest_calculation_months = %s,
@@ -483,7 +593,7 @@ def ingest_option_cashflow_details():
             ex_reason = "투자자/발행인 선택에 의한 조기상환 권리 행사" if has_option else None
             
             cur.execute("""
-                UPDATE "BondOptionExercise" SET
+                UPDATE bond_option_exercise SET
                     option_type = %s,
                     exercise_start_date_1 = %s,
                     exercise_end_date_1 = %s,
@@ -538,14 +648,14 @@ def ingest_daily_market_data():
                     change_rate_str = item.get('clprVs')
                     
                     # 1) Bond 테이블에서 bond_id 조회
-                    cur.execute('SELECT bond_id FROM "Bond" WHERE isin_code = %s;', (isin_code,))
+                    cur.execute('SELECT bond_id FROM bond WHERE isin_code = %s;', (isin_code,))
                     res = cur.fetchone()
                     if res:
                         bond_id = res[0]
                         
                         # 2) Bond 테이블의 short_code / short_name 업데이트
                         cur.execute("""
-                            UPDATE "Bond" SET
+                            UPDATE bond SET
                                 short_code = COALESCE(short_code, %s),
                                 short_name = COALESCE(short_name, %s),
                                 updated_at = CURRENT_TIMESTAMP
@@ -560,7 +670,7 @@ def ingest_daily_market_data():
                         base_date = datetime.strptime(date_str, "%Y%m%d").date()
                         
                         cur.execute("""
-                            INSERT INTO "BondMarketData" (
+                            INSERT INTO bond_market_data (
                                 bond_id, base_date, price, ytm, trading_volume, price_change_rate, created_at, updated_at
                             ) VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                             ON CONFLICT (bond_id, base_date) DO UPDATE SET
@@ -585,19 +695,19 @@ def verify_data_count():
     conn = psycopg2.connect(host=DB_HOST, port=DB_PORT, database=POSTGRES_DB, user=POSTGRES_USER, password=POSTGRES_PASSWORD)
     cur = conn.cursor()
     
-    cur.execute("SELECT count(*) FROM \"Bond\";")
+    cur.execute("SELECT count(*) FROM bond;")
     bond_count = cur.fetchone()[0]
     print(f"Total records in Bond table: {bond_count}")
     
-    cur.execute("SELECT count(*) FROM \"BondCashflowRule\" WHERE first_interest_payment_date IS NOT NULL;")
+    cur.execute("SELECT count(*) FROM bond_cashflow_rule WHERE first_interest_payment_date IS NOT NULL;")
     cashflow_count = cur.fetchone()[0]
     print(f"Enriched records in BondCashflowRule table: {cashflow_count}")
     
-    cur.execute("SELECT count(*) FROM \"BondOptionExercise\" WHERE exercise_start_date_1 IS NOT NULL OR option_type = '옵션해당사항없음';")
+    cur.execute("SELECT count(*) FROM bond_option_exercise WHERE exercise_start_date_1 IS NOT NULL OR option_type = '옵션해당사항없음';")
     option_count = cur.fetchone()[0]
     print(f"Enriched records in BondOptionExercise table: {option_count}")
     
-    cur.execute("SELECT count(*) FROM \"BondMarketData\";")
+    cur.execute("SELECT count(*) FROM bond_market_data;")
     market_count = cur.fetchone()[0]
     print(f"Total records in BondMarketData table: {market_count}")
     
@@ -608,6 +718,53 @@ def verify_data_count():
         
     cur.close()
     conn.close()
+
+# --- 4. HDFS 데이터 보존 정책 (Retention Policy) 정리 함수 ---
+def cleanup_old_hdfs_partitions():
+    import requests
+    from datetime import datetime, timedelta
+    
+    # 30일 이전의 데이터를 삭제 타겟으로 설정
+    retention_days = 30
+    cutoff_date = datetime.now() - timedelta(days=retention_days)
+    cutoff_str = cutoff_date.strftime("%Y%m%d")
+    
+    print(f"Starting HDFS cleanup. Retention policy: {retention_days} days. Cutoff Date: {cutoff_str}")
+    
+    # HDFS WebHDFS API를 이용해 관리하는 디렉토리들의 목록을 조회합니다.
+    hdfs_base_urls = [
+        "http://namenode:9870/webhdfs/v1/raw/bonds",
+        "http://namenode:9870/webhdfs/v1/dw/bonds",
+        "http://namenode:9870/webhdfs/v1/raw/news"
+    ]
+    
+    for base_url in hdfs_base_urls:
+        list_url = f"{base_url}?op=LISTSTATUS"
+        try:
+            resp = requests.get(list_url, timeout=15)
+            if resp.status_code == 200:
+                statuses = resp.json().get("FileStatuses", {}).get("FileStatus", [])
+                for status in statuses:
+                    path_suffix = status.get("pathSuffix", "")
+                    # 파티션 디렉토리는 'bas_dt=YYYYMMDD' 형식을 가집니다.
+                    if path_suffix.startswith("bas_dt="):
+                        dt_str = path_suffix.split("=")[1]
+                        # 날짜 문자열이 YYYYMMDD 형태이고 cutoff_str보다 작다면 삭제
+                        if len(dt_str) == 8 and dt_str.isdigit():
+                            if dt_str < cutoff_str:
+                                delete_url = f"{base_url}/{path_suffix}?op=DELETE&recursive=true"
+                                print(f"Deleting expired HDFS partition: {base_url}/{path_suffix}")
+                                del_resp = requests.delete(delete_url, timeout=15)
+                                if del_resp.status_code == 200:
+                                    print(f"Successfully deleted {path_suffix}")
+                                else:
+                                    print(f"Failed to delete {path_suffix}: {del_resp.text}")
+            elif resp.status_code == 404:
+                print(f"Directory not found (it might be empty or not created yet): {base_url}")
+            else:
+                print(f"Failed to list directory {base_url}: {resp.status_code} - {resp.text}")
+        except Exception as e:
+            print(f"Error during cleaning {base_url}: {e}")
 
 # --- DAG 설정 ---
 default_args = {
@@ -630,9 +787,14 @@ with DAG(
         python_callable=fetch_and_produce_bond_data,
     )
 
-    spark_task = PythonOperator(
-        task_id='spark_process_kafka_to_db',
-        python_callable=run_spark_bond_batch,
+    spark_kafka_to_hdfs = PythonOperator(
+        task_id='spark_kafka_to_hdfs',
+        python_callable=run_spark_kafka_to_hdfs,
+    )
+
+    spark_hdfs_to_postgres = PythonOperator(
+        task_id='spark_hdfs_to_postgres',
+        python_callable=run_spark_hdfs_to_postgres,
     )
 
     ingest_details_task = PythonOperator(
@@ -650,4 +812,9 @@ with DAG(
         python_callable=verify_data_count,
     )
 
-    collect_task >> spark_task >> [ingest_details_task, ingest_market_data_task] >> verify_task
+    hdfs_cleanup_task = PythonOperator(
+        task_id='hdfs_cleanup_task',
+        python_callable=cleanup_old_hdfs_partitions,
+    )
+
+    collect_task >> spark_kafka_to_hdfs >> spark_hdfs_to_postgres >> [ingest_details_task, ingest_market_data_task] >> verify_task >> hdfs_cleanup_task
