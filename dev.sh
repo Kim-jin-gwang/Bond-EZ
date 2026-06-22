@@ -100,9 +100,9 @@ fi
 info "Building all Docker images (this may take a while)..."
 $COMPOSE build
 
-# 2. 인프라 서비스 먼저 실행 (DB, Kafka)
-info "Starting infrastructure services (DB, Zookeeper, Kafka)..."
-$COMPOSE up -d db zookeeper kafka
+# 2. 인프라 서비스 먼저 실행 (DB, Kafka, Hadoop HDFS)
+info "Starting infrastructure services (DB, Zookeeper, Kafka, Hadoop HDFS)..."
+$COMPOSE up -d db zookeeper kafka namenode datanode
 
 # 3. DB 준비 대기 (Airflow와 Backend가 DB에 의존함)
 info "Waiting for database to be healthy..."
@@ -119,17 +119,29 @@ $COMPOSE exec "$BACKEND_SERVICE" python manage.py migrate
 info "Loading Glossary data from CSV into PostgreSQL..."
 $COMPOSE exec news-crawler python glossary/glossary_pipeline.py --load
 
+# HDFS 디렉토리 초기 설정 (/raw/bonds, /raw/news)
+info "Initializing HDFS directories (/raw/bonds, /raw/news)..."
+for i in $(seq 1 15); do
+  if docker exec namenode hdfs dfs -mkdir -p /raw/bonds /raw/news >/dev/null 2>&1; then
+    info "Successfully initialized HDFS directories."
+    break
+  fi
+  info "Waiting for NameNode to finish formatting/startup... ($i/15)"
+  sleep 2
+done
+
 # 접속 정보 출력
 FRONTEND_PORT="$(env_value_or_default FRONTEND_PORT 5173)"
 BACKEND_PORT="$(env_value_or_default BACKEND_PORT 8000)"
 
 info "Deployment Complete!"
-printf '--------------------------------------------------\n'
+printf '%s\n' '--------------------------------------------------'
 printf '🚀 Services are running at:\n'
 printf '  - Frontend      : http://localhost:%s\n' "$FRONTEND_PORT"
 printf '  - Backend API   : http://localhost:%s\n' "$BACKEND_PORT"
 printf '  - Airflow UI    : http://localhost:8081\n'
 printf '  - Spark Master  : http://localhost:8080\n'
 printf '  - Flink UI      : http://localhost:8082\n'
-printf '--------------------------------------------------\n'
+printf '  - Hadoop Web UI : http://localhost:9870\n'
+printf '%s\n' '--------------------------------------------------'
 printf 'Use "docker compose logs -f" to watch logs.\n'
