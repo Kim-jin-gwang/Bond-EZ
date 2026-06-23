@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { NEWS_PAGE_SIZE, fetchNews, fetchNewsProviders } from '../../api/news'
+import { NEWS_PAGE_SIZE, fetchNews, fetchNewsProviders, summarizeNews } from '../../api/news'
 import { useDebouncedRef } from '../../composables/useDebouncedRef'
 
 const keywordInput = ref('')
@@ -12,6 +12,8 @@ const remoteNewsItems = ref([])
 const providers = ref([])
 const isLoading = ref(false)
 const error = ref(null)
+const summaryErrors = ref({})
+const summarizingIds = ref({})
 const currentPage = ref(1)
 const pageInfo = ref({
   number: 1,
@@ -37,8 +39,35 @@ function resetFilters() {
   openedSummaryId.value = null
 }
 
-function toggleSummary(id) {
-  openedSummaryId.value = openedSummaryId.value === id ? null : id
+async function toggleSummary(item) {
+  if (openedSummaryId.value === item.id) {
+    openedSummaryId.value = null
+    return
+  }
+
+  openedSummaryId.value = item.id
+  if (item.summary) return
+
+  await loadSummary(item)
+}
+
+async function loadSummary(item) {
+  summarizingIds.value = { ...summarizingIds.value, [item.id]: true }
+  summaryErrors.value = { ...summaryErrors.value, [item.id]: '' }
+
+  try {
+    const result = await summarizeNews(item.id)
+    remoteNewsItems.value = remoteNewsItems.value.map((news) =>
+      news.id === item.id ? { ...news, summary: result.summary } : news,
+    )
+  } catch (err) {
+    summaryErrors.value = {
+      ...summaryErrors.value,
+      [item.id]: err?.message || '뉴스 요약을 불러오지 못했습니다.',
+    }
+  } finally {
+    summarizingIds.value = { ...summarizingIds.value, [item.id]: false }
+  }
 }
 
 async function loadNews() {
@@ -149,15 +178,17 @@ onMounted(async () => {
             </span>
           </div>
           <div class="news-actions">
-            <button class="summary-button" type="button" @click="toggleSummary(item.id)">
-              {{ openedSummaryId === item.id ? '닫기' : '요약' }}
+            <button class="summary-button" type="button" :disabled="summarizingIds[item.id]" @click="toggleSummary(item)">
+              {{ summarizingIds[item.id] ? '요약 중' : openedSummaryId === item.id ? '닫기' : '요약' }}
             </button>
             <a class="open-news-button" :href="item.url" target="_blank" rel="noreferrer">뉴스 보기</a>
           </div>
         </div>
         <div v-if="openedSummaryId === item.id" class="news-summary">
           <strong>뉴스 요약</strong>
-          <p>{{ item.summary }}</p>
+          <p v-if="summarizingIds[item.id]">뉴스를 요약하는 중입니다.</p>
+          <p v-else-if="summaryErrors[item.id]" class="summary-error">{{ summaryErrors[item.id] }}</p>
+          <p v-else>{{ item.summary || '요약 내용이 없습니다.' }}</p>
           <a :href="item.url" target="_blank" rel="noreferrer">원문 보기</a>
         </div>
       </article>
@@ -304,6 +335,11 @@ onMounted(async () => {
   white-space: nowrap;
 }
 
+.summary-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
 .open-news-button {
   border-color: var(--line);
   color: var(--text);
@@ -326,6 +362,11 @@ onMounted(async () => {
 .news-summary p {
   margin-bottom: 10px;
   line-height: 1.65;
+}
+
+.news-summary .summary-error {
+  color: #b42318;
+  font-weight: 800;
 }
 
 .news-summary a {

@@ -1,5 +1,5 @@
 import { cachedQuery } from './cache'
-import { apiGet } from './client'
+import { apiGet, apiPost } from './client'
 
 export const NEWS_PAGE_SIZE = 20
 
@@ -22,6 +22,15 @@ export function fetchNewsProviders() {
     const data = await apiGet('/news/providers')
     return getItems(data).map(normalizeProvider)
   })
+}
+
+export async function summarizeNews(newsId) {
+  const data = await apiPost(`/news/${newsId}/summarize`, {})
+  return {
+    newsId: data.news_id || newsId,
+    summary: data.summary || '',
+    cached: Boolean(data.cached),
+  }
 }
 
 function getItems(data) {
