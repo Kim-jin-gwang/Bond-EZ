@@ -2,6 +2,7 @@
 import { computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import GlobalNav from './components/gnb/GlobalNav.vue'
+import FloatingBondChat from './components/chat/FloatingBondChat.vue'
 import { useNavigation } from './composables/useNavigation'
 import { useAppStore } from './stores/app'
 
@@ -48,5 +49,6 @@ watch(selectedIndicatorId, (indicatorId) => {
         </Suspense>
       </RouterView>
     </main>
+    <FloatingBondChat />
   </div>
 </template>

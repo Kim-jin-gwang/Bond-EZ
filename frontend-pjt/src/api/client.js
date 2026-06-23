@@ -33,6 +33,26 @@ export async function apiGet(path, options = {}) {
   return payload?.data ?? payload
 }
 
+export async function apiPost(path, body = {}, options = {}) {
+  const response = await fetch(buildUrl(path, options.params), {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+    body: JSON.stringify(body),
+  })
+  const payload = await parseJson(response)
+
+  if (!response.ok || payload?.success === false) {
+    throw new ApiError(payload?.message || response.statusText || 'API request failed', response, payload)
+  }
+
+  return payload?.data ?? payload
+}
+
 function buildUrl(path, params = null) {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`
   const url = new URL(`${API_BASE_URL}${normalizedPath}`, window.location.origin)
