@@ -1,25 +1,7 @@
 from django.core.cache import cache
-from django.db.models import OuterRef, Q, Subquery
+from django.db.models import Q
 
 from .models import Bond, BondMarketData, BondsMaster
-
-LIST_MARKET_DATA_FIELDS = (
-    "id",
-    "base_date",
-    "price",
-    "ytm",
-    "trading_volume",
-    "bid_yield",
-    "ask_yield",
-    "price_change_rate",
-)
-
-DETAIL_MARKET_DATA_FIELDS = (
-    *LIST_MARKET_DATA_FIELDS,
-    "substitute_price",
-    "duration",
-    "spread",
-)
 
 
 def has_normal_bonds():
@@ -33,19 +15,7 @@ def has_normal_bonds():
     return has_bonds
 
 
-def latest_market_data_annotations(fields):
-    latest_market_data = BondMarketData.objects.filter(
-        bond_id=OuterRef("pk"),
-        deleted_at__isnull=True,
-    ).order_by("-base_date")
-
-    return {
-        f"latest_market_data_{field}": Subquery(latest_market_data.values(field)[:1])
-        for field in fields
-    }
-
-
-def base_bond_queryset(market_data_fields=DETAIL_MARKET_DATA_FIELDS):
+def base_bond_queryset():
     return (
         Bond.objects.filter(deleted_at__isnull=True)
         .select_related(
@@ -57,8 +27,8 @@ def base_bond_queryset(market_data_fields=DETAIL_MARKET_DATA_FIELDS):
             "guarantee_status",
             "cashflow_rule",
             "option_exercise",
+            "latest_market_data",
         )
-        .annotate(**latest_market_data_annotations(market_data_fields))
     )
 
 
@@ -98,7 +68,7 @@ def filtered_bonds(params):
         ordering = ordering_map.get(params.get("sort"), "maturity_date")
         return queryset.order_by(ordering, "isin_code")
 
-    queryset = base_bond_queryset(market_data_fields=LIST_MARKET_DATA_FIELDS)
+    queryset = base_bond_queryset()
 
     keyword = params.get("keyword")
     if keyword:
@@ -140,21 +110,21 @@ def filtered_bonds(params):
 
     min_ytm = params.get("min_ytm")
     if min_ytm:
-        queryset = queryset.filter(latest_market_data_ytm__gte=min_ytm)
+        queryset = queryset.filter(latest_market_data__ytm__gte=min_ytm)
 
     max_ytm = params.get("max_ytm")
     if max_ytm:
-        queryset = queryset.filter(latest_market_data_ytm__lte=max_ytm)
+        queryset = queryset.filter(latest_market_data__ytm__lte=max_ytm)
 
     ordering_map = {
         "maturity_asc": "maturity_date",
         "maturity_desc": "-maturity_date",
         "coupon_rate_desc": "-coupon_rate",
         "coupon_rate_asc": "coupon_rate",
-        "ytm_desc": "-latest_market_data_ytm",
-        "ytm_asc": "latest_market_data_ytm",
-        "trading_volume_desc": "-latest_market_data_trading_volume",
-        "price_change_rate_desc": "-latest_market_data_price_change_rate",
+        "ytm_desc": "-latest_market_data__ytm",
+        "ytm_asc": "latest_market_data__ytm",
+        "trading_volume_desc": "-latest_market_data__trading_volume",
+        "price_change_rate_desc": "-latest_market_data__price_change_rate",
     }
     ordering = ordering_map.get(params.get("sort"), "maturity_date")
     return queryset.order_by(ordering, "id")

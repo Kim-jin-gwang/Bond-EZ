@@ -216,6 +216,30 @@ class BondMarketData(TimeStampedSoftDeleteModel):
         ]
 
 
+class LatestBondMarketData(models.Model):
+    id = models.BigIntegerField(primary_key=True, db_column="market_data_id")
+    bond = models.OneToOneField(
+        Bond,
+        on_delete=models.DO_NOTHING,
+        related_name="latest_market_data",
+        db_column="bond_id",
+    )
+    base_date = models.DateField()
+    price = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    ytm = models.DecimalField(max_digits=6, decimal_places=3, null=True, blank=True)
+    duration = models.DecimalField(max_digits=8, decimal_places=4, null=True, blank=True)
+    spread = models.DecimalField(max_digits=8, decimal_places=7, null=True, blank=True)
+    trading_volume = models.BigIntegerField(null=True, blank=True)
+    substitute_price = models.CharField(max_length=255, null=True, blank=True)
+    bid_yield = models.CharField(max_length=255, null=True, blank=True)
+    ask_yield = models.CharField(max_length=255, null=True, blank=True)
+    price_change_rate = models.CharField(max_length=255, null=True, blank=True)
+
+    class Meta:
+        managed = False
+        db_table = "latest_bond_market_data"
+
+
 class BondsMaster(models.Model):
     isin_code = models.CharField(max_length=255, primary_key=True)
     bond_name = models.CharField(max_length=255)

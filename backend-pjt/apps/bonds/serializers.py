@@ -1,3 +1,6 @@
+from django.core.exceptions import ObjectDoesNotExist
+
+
 def number_or_none(value):
     if value is None or value == "":
         return None
@@ -98,7 +101,12 @@ def serialize_list_market_data(market_data):
     }
 
 
-def get_latest_market_data(bond):
+def get_latest_market_data(bond, allow_fallback=True):
+    try:
+        return bond.latest_market_data
+    except (AttributeError, ObjectDoesNotExist):
+        pass
+
     if hasattr(bond, "latest_market_data_id"):
         return {
             "id": bond.latest_market_data_id,
@@ -113,6 +121,9 @@ def get_latest_market_data(bond):
             "ask_yield": getattr(bond, "latest_market_data_ask_yield", None),
             "price_change_rate": getattr(bond, "latest_market_data_price_change_rate", None),
         }
+
+    if not allow_fallback:
+        return None
 
     return bond.market_data.filter(deleted_at__isnull=True).order_by("-base_date").first()
 
@@ -148,7 +159,7 @@ def serialize_bond_list_item(bond):
         }
 
     issuer = bond.issuer
-    latest_market_data = get_latest_market_data(bond)
+    latest_market_data = get_latest_market_data(bond, allow_fallback=False)
 
     return {
         "bond_id": bond.id,
