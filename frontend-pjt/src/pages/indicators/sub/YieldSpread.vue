@@ -45,7 +45,26 @@ const currentValue = computed(() => {
 
     <section class="explanation">
       <h3>개념 설명</h3>
-      <p>10년 금리에서 3년 금리를 뺀 값입니다. 값이 낮아질수록 장기와 단기 금리의 차이가 줄어드는 흐름으로 볼 수 있습니다.</p>
+      <p>
+        장단기 금리차는 10년 금리에서 3년 금리를 뺀 값입니다. 일반적으로 장기 금리는 미래 성장률과 물가 기대를,
+        단기 금리는 현재 통화정책과 단기 자금 사정을 더 강하게 반영합니다. 따라서 이 차이가 넓으면 시장이 장기
+        불확실성이나 성장 기대를 더 크게 반영하는 흐름으로, 좁아지면 경기 둔화 우려나 금리 인하 기대가 커지는
+        흐름으로 해석할 수 있습니다.
+      </p>
+      <div class="explanation-grid" aria-label="장단기 금리차 해석 기준">
+        <article>
+          <strong>상태 기준</strong>
+          <p>0%p 미만은 역전 구간, 0~0.15%p는 평탄 구간, 0.15%p 초과는 정상 구간으로 구분합니다.</p>
+        </article>
+        <article>
+          <strong>데이터 이해</strong>
+          <p>값의 절대 수준보다 방향성이 중요합니다. 전월보다 낮아지면 수익률 곡선이 평평해지는 흐름, 높아지면 장기 금리가 단기 금리보다 더 강하게 반응하는 흐름입니다.</p>
+        </article>
+        <article>
+          <strong>활용 포인트</strong>
+          <p>채권 투자에서는 경기 전망, 금리 정책 기대, 만기 선택을 함께 볼 때 유용합니다. 단독 매수 신호보다는 다른 금리 지표와 같이 확인하는 보조 지표로 보는 편이 좋습니다.</p>
+        </article>
+      </div>
     </section>
 
     <section class="table-panel">
@@ -75,14 +94,6 @@ const currentValue = computed(() => {
           </tr>
         </tbody>
       </table>
-    </section>
-
-    <section class="summary-grid">
-      <article v-for="row in spreadRows" :key="`${row.country}-summary`" :class="row.tone">
-        <span>{{ row.country }}</span>
-        <strong :class="{ negative: row.spread < 0 }">{{ row.value }}</strong>
-        <small>{{ row.state }}</small>
-      </article>
     </section>
 
     <section class="chart-panel">
@@ -163,8 +174,6 @@ const currentValue = computed(() => {
 .current-value small,
 .panel-title span,
 .panel-title p,
-.summary-grid span,
-.summary-grid small,
 .spread-card header span {
   color: var(--muted);
   font-size: 13px;
@@ -191,6 +200,32 @@ const currentValue = computed(() => {
 .explanation p {
   margin-bottom: 0;
   line-height: 1.7;
+}
+
+.explanation-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.explanation-grid article {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.explanation-grid strong {
+  color: var(--primary-dark);
+  font-size: 14px;
+}
+
+.explanation-grid p {
+  color: var(--muted);
+  font-size: 14px;
 }
 
 .panel-title {
@@ -220,14 +255,12 @@ const currentValue = computed(() => {
 }
 
 .spread-table strong,
-.summary-grid strong,
 .spread-value strong {
   color: var(--primary-dark);
   font-size: 22px;
 }
 
 .spread-table strong.negative,
-.summary-grid strong.negative,
 .spread-value strong.negative {
   color: #b45309;
 }
@@ -252,14 +285,12 @@ const currentValue = computed(() => {
   background: #fff1dc;
 }
 
-.summary-grid,
 .spread-chart-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
 
-.summary-grid article,
 .spread-card {
   display: grid;
   gap: 8px;
@@ -271,17 +302,14 @@ const currentValue = computed(() => {
   box-shadow: var(--shadow);
 }
 
-.summary-grid article.us,
 .spread-card.us {
   border-left-color: #1f6f78;
 }
 
-.summary-grid article.jp,
 .spread-card.jp {
   border-left-color: #d98c31;
 }
 
-.summary-grid article.kr,
 .spread-card.kr {
   border-left-color: #127c57;
 }
@@ -341,7 +369,7 @@ const currentValue = computed(() => {
 
 @media (max-width: 960px) {
   .indicator-header,
-  .summary-grid,
+  .explanation-grid,
   .spread-chart-grid {
     grid-template-columns: 1fr;
   }
