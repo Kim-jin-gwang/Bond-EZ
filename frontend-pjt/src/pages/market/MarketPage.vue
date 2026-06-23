@@ -170,8 +170,9 @@ function goToPage(page) {
 
 function getPageButtons(page, totalPages) {
   const safeTotal = Math.max(1, totalPages || 1)
-  const start = Math.max(1, Math.min(page - 2, safeTotal - 4))
-  const end = Math.min(safeTotal, start + 4)
+  const pageGroupSize = 5
+  const start = Math.floor((page - 1) / pageGroupSize) * pageGroupSize + 1
+  const end = Math.min(safeTotal, start + pageGroupSize - 1)
   return Array.from({ length: end - start + 1 }, (_, index) => start + index)
 }
 
