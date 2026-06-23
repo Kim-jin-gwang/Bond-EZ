@@ -4,11 +4,13 @@ export function createEmptyBondFilters() {
   return {
     bondTypes: [],
     maturities: [],
-    yields: [],
+    minCoupon: '',
+    maxCoupon: '',
     ratings: [],
     interestCycles: [],
     optionTypes: [],
     seniorities: [],
+    guaranteeStatuses: [],
   }
 }
 
@@ -33,7 +35,7 @@ export function useBondFilter(bonds, searchKeyword, selectedFilters) {
         matchesKeyword &&
         matchesIncluded(filters.bondTypes, bond.type) &&
         matchesMaturity(bond, filters.maturities) &&
-        matchesYield(bond, filters.yields) &&
+        matchesCoupon(bond, filters.minCoupon, filters.maxCoupon) &&
         matchesIncluded(filters.ratings, bond.ratingGroup) &&
         matchesIncluded(filters.interestCycles, bond.interestCycle) &&
         matchesIncluded(filters.optionTypes, bond.option) &&
@@ -65,10 +67,11 @@ function matchesMaturity(bond, maturities) {
   })
 }
 
-function matchesYield(bond, yields) {
-  if (!hasSelected(yields)) return true
-  return yields.some((yieldText) => {
-    const threshold = Number(yieldText.replace(/[^0-9.]/g, ''))
-    return bond.yieldValue >= threshold
-  })
+function matchesCoupon(bond, minCoupon, maxCoupon) {
+  const minVal = minCoupon !== '' && minCoupon !== null && minCoupon !== undefined ? Number(minCoupon) : null
+  const maxVal = maxCoupon !== '' && maxCoupon !== null && maxCoupon !== undefined ? Number(maxCoupon) : null
+
+  if (minVal !== null && !isNaN(minVal) && bond.couponRate < minVal) return false
+  if (maxVal !== null && !isNaN(maxVal) && bond.couponRate > maxVal) return false
+  return true
 }

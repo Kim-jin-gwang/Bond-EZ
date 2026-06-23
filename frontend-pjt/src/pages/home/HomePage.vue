@@ -1,7 +1,8 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { fetchBonds } from '../../api/bonds'
+import { fetchBonds, fetchFilterOptions } from '../../api/bonds'
 import { fetchIndicators } from '../../api/indicators'
+import { createEmptyBondFilters } from '../../composables/useBondFilter'
 
 const bonds = ref([])
 const indicators = ref([])
@@ -23,20 +24,79 @@ const filtersOpen = ref(false)
 const indicatorCarousel = ref(null)
 const searchKeyword = ref('')
 const selectedFilters = ref({
-  bondTypes: ['국채'],
-  maturities: [],
-  yields: [],
-  ratings: [],
-  interestCycles: [],
+  ...createEmptyBondFilters(),
 })
 
-const filterGroups = [
-  { key: 'bondTypes', label: '채권 종류', options: ['국채', '회사채', '금융채'] },
-  { key: 'maturities', label: '만기', options: ['1년 이하', '1~3년', '3~5년', '5~10년', '10년 이상'] },
-  { key: 'yields', label: '수익률', options: ['3% 이상', '4% 이상', '5% 이상', '6% 이상'] },
-  { key: 'ratings', label: '신용등급', options: ['AAA', 'AA', 'A', 'BBB'] },
-  { key: 'interestCycles', label: '이자 지급 주기', options: ['3개월', '6개월', '12개월', '만기일시'] },
-]
+const filterGroups = ref([
+  {
+    key: 'bondTypes',
+    label: '채권 종류',
+    options: [
+      { value: '국채', label: '국채' },
+      { value: '회사채', label: '회사채' },
+      { value: '금융채', label: '금융채' },
+    ],
+  },
+  {
+    key: 'maturities',
+    label: '만기',
+    options: [
+      { value: '1년 이하', label: '1년 이하' },
+      { value: '1~3년', label: '1~3년' },
+      { value: '3~5년', label: '3~5년' },
+      { value: '5~10년', label: '5~10년' },
+      { value: '10년 이상', label: '10년 이상' },
+    ],
+  },
+  {
+    key: 'couponRates',
+    label: '표면금리',
+  },
+  {
+    key: 'ratings',
+    label: '신용등급',
+    options: [
+      { value: 'AAA', label: 'AAA' },
+      { value: 'AA', label: 'AA' },
+      { value: 'A', label: 'A' },
+      { value: 'BBB', label: 'BBB' },
+    ],
+  },
+  {
+    key: 'interestCycles',
+    label: '이자 지급 주기',
+    options: [
+      { value: '1개월', label: '1개월' },
+      { value: '2개월', label: '2개월' },
+      { value: '3개월', label: '3개월' },
+      { value: '6개월', label: '6개월' },
+      { value: '12개월', label: '12개월' },
+      { value: '만기일시', label: '만기일시' },
+    ],
+  },
+  {
+    key: 'optionTypes',
+    label: '옵션',
+    options: [
+      { value: 'CALL', label: 'CALL' },
+      { value: 'PUT', label: 'PUT' },
+      { value: '없음', label: '없음' },
+    ],
+  },
+  {
+    key: 'seniorities',
+    label: '선후순위',
+    options: [
+      { value: '선순위', label: '선순위' },
+      { value: '후순위', label: '후순위' },
+    ],
+  },
+  {
+    key: 'guaranteeStatuses',
+    label: '보증 여부',
+    options: [],
+  },
+])
 
 const homeIndicatorCards = computed(() => {
   if (!indicators.value.length) {
@@ -132,7 +192,10 @@ const curatedBonds = computed(() => {
 
 function cloneFilters() {
   return Object.fromEntries(
-    Object.entries(selectedFilters.value).map(([key, values]) => [key, [...values]]),
+    Object.entries(selectedFilters.value).map(([key, values]) => [
+      key,
+      Array.isArray(values) ? [...values] : values,
+    ]),
   )
 }
 
@@ -142,6 +205,29 @@ function searchBonds() {
     keyword: searchKeyword.value.trim(),
     filters: cloneFilters(),
   })
+}
+
+function clickHashtag(tag) {
+  selectedFilters.value = createEmptyBondFilters()
+  searchKeyword.value = ''
+
+  if (tag === '국고채') {
+    searchKeyword.value = '국고채'
+  } else if (tag === '고수익') {
+    selectedFilters.value.minCoupon = 4
+  } else if (tag === '안정형') {
+    selectedFilters.value.ratings = ['AAA', 'AA']
+  } else if (tag === '콜옵션') {
+    selectedFilters.value.optionTypes = ['CALL']
+  } else if (tag === '월배당') {
+    selectedFilters.value.interestCycles = ['1개월']
+  } else if (tag === '단기채') {
+    selectedFilters.value.maturities = ['1년 이하']
+  } else if (tag === '회사채') {
+    selectedFilters.value.bondTypes = ['일반회사채']
+  }
+
+  searchBonds()
 }
 
 function scrollIndicators(direction) {
@@ -160,7 +246,76 @@ function scrollIndicators(direction) {
   })
 }
 
+function clearGroupFilter(key) {
+  if (key === 'couponRates') {
+    selectedFilters.value.minCoupon = ''
+    selectedFilters.value.maxCoupon = ''
+  } else {
+    selectedFilters.value[key] = []
+  }
+}
+
+async function loadFilterOptions() {
+  try {
+    const data = await fetchFilterOptions()
+    if (!data) return
+
+    const groups = JSON.parse(JSON.stringify(filterGroups.value))
+
+    if (data.bond_types && data.bond_types.length) {
+      const group = groups.find(g => g.key === 'bondTypes')
+      if (group) {
+        group.options = data.bond_types.map(t => ({
+          value: t.bond_type,
+          label: t.bond_type,
+        }))
+      }
+    }
+
+    if (data.credit_ratings && data.credit_ratings.length) {
+      const group = groups.find(g => g.key === 'ratings')
+      if (group) {
+        const uniqueGroups = Array.from(
+          new Set(
+            data.credit_ratings.map(r => r.rating_name.replace(/[+-0-9]/g, '').trim())
+          )
+        ).filter(Boolean)
+        
+        group.options = uniqueGroups.map(name => ({
+          value: name,
+          label: name,
+        }))
+      }
+    }
+
+    if (data.seniorities && data.seniorities.length) {
+      const group = groups.find(g => g.key === 'seniorities')
+      if (group) {
+        group.options = data.seniorities.map(s => ({
+          value: s.seniority_name,
+          label: s.seniority_name,
+        }))
+      }
+    }
+
+    if (data.guarantee_statuses && data.guarantee_statuses.length) {
+      const group = groups.find(g => g.key === 'guaranteeStatuses')
+      if (group) {
+        group.options = data.guarantee_statuses.map(g => ({
+          value: g.guarantee_status,
+          label: g.guarantee_status,
+        }))
+      }
+    }
+
+    filterGroups.value = groups
+  } catch (err) {
+    console.error('Failed to load filter options:', err)
+  }
+}
+
 onMounted(async () => {
+  loadFilterOptions()
   const [remoteBonds, remoteIndicators] = await Promise.all([
     fetchBonds(),
     fetchIndicators(),
@@ -211,10 +366,13 @@ onMounted(async () => {
         </div>
 
         <div class="tag-row" aria-label="인기 검색어">
-          <button type="button" @click="searchKeyword = '국고채'">#국고채</button>
-          <button type="button" @click="searchKeyword = '고수익'">#고수익</button>
-          <button type="button" @click="searchKeyword = '안정형'">#안정형</button>
-          <button type="button" @click="searchKeyword = '콜옵션'">#콜옵션</button>
+          <button type="button" @click="clickHashtag('국고채')">#국고채</button>
+          <button type="button" @click="clickHashtag('고수익')">#고수익</button>
+          <button type="button" @click="clickHashtag('안정형')">#안정형</button>
+          <button type="button" @click="clickHashtag('콜옵션')">#콜옵션</button>
+          <button type="button" @click="clickHashtag('월배당')">#월배당</button>
+          <button type="button" @click="clickHashtag('단기채')">#단기채</button>
+          <button type="button" @click="clickHashtag('회사채')">#회사채</button>
         </div>
 
         <button class="accordion-trigger" type="button" @click="filtersOpen = !filtersOpen">
@@ -225,10 +383,51 @@ onMounted(async () => {
         <div v-if="filtersOpen" class="filter-grid">
           <fieldset v-for="group in filterGroups" :key="group.key" class="filter-group">
             <legend>{{ group.label }}</legend>
-            <label v-for="option in group.options" :key="option" class="filter-chip">
-              <input v-model="selectedFilters[group.key]" type="checkbox" :value="option" />
-              <span>{{ option }}</span>
-            </label>
+            <template v-if="group.key === 'couponRates'">
+              <div class="coupon-range-wrapper">
+                <label class="filter-chip">
+                  <input
+                    type="checkbox"
+                    :checked="selectedFilters.minCoupon === '' && selectedFilters.maxCoupon === ''"
+                    @change="clearGroupFilter('couponRates')"
+                  />
+                  <span>전체</span>
+                </label>
+                <div class="coupon-range-inputs">
+                  <input
+                    type="number"
+                    v-model.number="selectedFilters.minCoupon"
+                    placeholder="최소 (%)"
+                    step="0.1"
+                    min="0"
+                    class="coupon-input"
+                  />
+                  <span class="range-separator">~</span>
+                  <input
+                    type="number"
+                    v-model.number="selectedFilters.maxCoupon"
+                    placeholder="최대 (%)"
+                    step="0.1"
+                    min="0"
+                    class="coupon-input"
+                  />
+                </div>
+              </div>
+            </template>
+            <template v-else>
+              <label class="filter-chip">
+                <input
+                  type="checkbox"
+                  :checked="selectedFilters[group.key].length === 0"
+                  @change="clearGroupFilter(group.key)"
+                />
+                <span>전체</span>
+              </label>
+              <label v-for="option in group.options" :key="option.value" class="filter-chip">
+                <input v-model="selectedFilters[group.key]" type="checkbox" :value="option.value" />
+                <span>{{ option.label }}</span>
+              </label>
+            </template>
           </fieldset>
         </div>
       </div>

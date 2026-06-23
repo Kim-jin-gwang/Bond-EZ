@@ -3,6 +3,13 @@ import { apiGet } from './client'
 
 export const BOND_PAGE_SIZE = 20
 
+export function fetchFilterOptions() {
+  return cachedQuery('bonds:filter-options', async () => {
+    const data = await apiGet('/bonds/filter-options')
+    return data
+  })
+}
+
 export function fetchBonds(params = {}) {
   const requestParams = {
     ...params,
@@ -12,7 +19,7 @@ export function fetchBonds(params = {}) {
   const cacheKey = `bonds:list:${JSON.stringify(requestParams)}`
 
   return cachedQuery(cacheKey, async () => {
-    const payload = await apiGet('/bonds', { params: requestParams, raw: true })
+    const payload = await apiGet('/search/bonds', { params: requestParams, raw: true })
     return normalizePaginatedResponse(payload, normalizeBond)
   })
 }

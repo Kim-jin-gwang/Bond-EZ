@@ -544,9 +544,41 @@ p {
   background: var(--primary);
 }
 
-.filter-chip input:focus-visible + span {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+.coupon-range-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+}
+
+.coupon-range-inputs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.coupon-input {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 14px;
+  background: white;
+  color: var(--primary-dark);
+  box-sizing: border-box;
+}
+
+.coupon-input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.range-separator {
+  color: var(--muted);
+  font-weight: 700;
 }
 
 label {
