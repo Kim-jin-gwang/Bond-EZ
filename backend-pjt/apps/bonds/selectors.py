@@ -2,17 +2,42 @@ from django.db.models import OuterRef, Q, Subquery
 
 from .models import Bond, BondMarketData, BondsMaster
 
+LIST_MARKET_DATA_FIELDS = (
+    "id",
+    "base_date",
+    "price",
+    "ytm",
+    "trading_volume",
+    "bid_yield",
+    "ask_yield",
+    "price_change_rate",
+)
+
+DETAIL_MARKET_DATA_FIELDS = (
+    *LIST_MARKET_DATA_FIELDS,
+    "substitute_price",
+    "duration",
+    "spread",
+)
+
 
 def has_normal_bonds():
     return Bond.objects.filter(deleted_at__isnull=True).exists()
 
 
-def base_bond_queryset():
+def latest_market_data_annotations(fields):
     latest_market_data = BondMarketData.objects.filter(
         bond_id=OuterRef("pk"),
         deleted_at__isnull=True,
     ).order_by("-base_date")
 
+    return {
+        f"latest_market_data_{field}": Subquery(latest_market_data.values(field)[:1])
+        for field in fields
+    }
+
+
+def base_bond_queryset(market_data_fields=DETAIL_MARKET_DATA_FIELDS):
     return (
         Bond.objects.filter(deleted_at__isnull=True)
         .select_related(
@@ -25,19 +50,7 @@ def base_bond_queryset():
             "cashflow_rule",
             "option_exercise",
         )
-        .annotate(
-            latest_market_data_id=Subquery(latest_market_data.values("id")[:1]),
-            latest_market_data_base_date=Subquery(latest_market_data.values("base_date")[:1]),
-            latest_market_data_price=Subquery(latest_market_data.values("price")[:1]),
-            latest_market_data_substitute_price=Subquery(latest_market_data.values("substitute_price")[:1]),
-            latest_market_data_ytm=Subquery(latest_market_data.values("ytm")[:1]),
-            latest_market_data_duration=Subquery(latest_market_data.values("duration")[:1]),
-            latest_market_data_spread=Subquery(latest_market_data.values("spread")[:1]),
-            latest_market_data_trading_volume=Subquery(latest_market_data.values("trading_volume")[:1]),
-            latest_market_data_bid_yield=Subquery(latest_market_data.values("bid_yield")[:1]),
-            latest_market_data_ask_yield=Subquery(latest_market_data.values("ask_yield")[:1]),
-            latest_market_data_price_change_rate=Subquery(latest_market_data.values("price_change_rate")[:1]),
-        )
+        .annotate(**latest_market_data_annotations(market_data_fields))
     )
 
 
@@ -77,7 +90,7 @@ def filtered_bonds(params):
         ordering = ordering_map.get(params.get("sort"), "maturity_date")
         return queryset.order_by(ordering, "isin_code")
 
-    queryset = base_bond_queryset()
+    queryset = base_bond_queryset(market_data_fields=LIST_MARKET_DATA_FIELDS)
 
     keyword = params.get("keyword")
     if keyword:

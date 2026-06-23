@@ -64,6 +64,34 @@ def serialize_market_data(market_data):
     }
 
 
+def serialize_list_market_data(market_data):
+    if market_data is None:
+        return None
+
+    if isinstance(market_data, dict):
+        return {
+            "market_data_id": market_data.get("id"),
+            "base_date": date_or_none(market_data.get("base_date")),
+            "price": number_or_none(market_data.get("price")),
+            "ytm": number_or_none(market_data.get("ytm")),
+            "trading_volume": market_data.get("trading_volume"),
+            "bid_yield": number_or_none(market_data.get("bid_yield")),
+            "ask_yield": number_or_none(market_data.get("ask_yield")),
+            "price_change_rate": number_or_none(market_data.get("price_change_rate")),
+        }
+
+    return {
+        "market_data_id": market_data.id,
+        "base_date": date_or_none(market_data.base_date),
+        "price": number_or_none(market_data.price),
+        "ytm": number_or_none(market_data.ytm),
+        "trading_volume": market_data.trading_volume,
+        "bid_yield": number_or_none(market_data.bid_yield),
+        "ask_yield": number_or_none(market_data.ask_yield),
+        "price_change_rate": number_or_none(market_data.price_change_rate),
+    }
+
+
 def get_latest_market_data(bond):
     annotated_id = getattr(bond, "latest_market_data_id", None)
     if annotated_id is not None:
@@ -148,7 +176,7 @@ def serialize_bond_list_item(bond):
             if bond.option_exercise_id
             else None
         ),
-        "latest_market_data": serialize_market_data(latest_market_data),
+        "latest_market_data": serialize_list_market_data(latest_market_data),
     }
 
 
