@@ -42,10 +42,16 @@ def summarize_news_content(title, content):
     if not cleaned_content:
         raise NewsSummaryInputError()
 
-    prediction = get_summarizer()(title=cleaned_title, content=cleaned_content[:CONTENT_MAX_CHARS])
-    summary = clean_summary(extract_summary(prediction))
-    if not summary:
-        summary = clean_summary(generate_direct_summary(cleaned_title, cleaned_content[:CONTENT_MAX_CHARS]))
+    try:
+        prediction = get_summarizer()(title=cleaned_title, content=cleaned_content[:CONTENT_MAX_CHARS])
+        summary = clean_summary(extract_summary(prediction))
+        if not summary:
+            summary = clean_summary(generate_direct_summary(cleaned_title, cleaned_content[:CONTENT_MAX_CHARS]))
+    except NewsSummarizerError:
+        raise
+    except Exception as exc:
+        raise NewsSummarizerError("뉴스 요약 모델 호출에 실패했습니다.") from exc
+
     if summary and not is_valid_summary(summary):
         summary = coerce_valid_summary(summary)
     if is_malformed_summary(summary):
@@ -111,10 +117,14 @@ def build_lm(dspy):
 
 def get_lm_api_key(model):
     if model.startswith("gemini/"):
-        return getattr(settings, "GEMINI_API_KEY", "")
+        return clean_secret(getattr(settings, "GEMINI_API_KEY", ""))
     if model.startswith("openai/"):
-        return getattr(settings, "OPENAI_API_KEY", "")
-    return getattr(settings, "NEWS_SUMMARY_LM_API_KEY", "")
+        return clean_secret(getattr(settings, "OPENAI_API_KEY", ""))
+    return clean_secret(getattr(settings, "NEWS_SUMMARY_LM_API_KEY", ""))
+
+
+def clean_secret(value):
+    return str(value or "").strip().strip('"').strip("'")
 
 
 def import_dspy():

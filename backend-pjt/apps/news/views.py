@@ -6,6 +6,7 @@ from apps.common.responses import error, ok, paginated_response, parse_json_body
 from .models import NewsProvider
 from .selectors import filtered_news, get_news
 from .serializers import serialize_news_detail, serialize_news_list_item, serialize_provider
+from .services import summarize_news_by_id
 from .summarizer import NewsSummarizerError, summarize_news_content
 
 
@@ -30,10 +31,62 @@ def provider_list(request):
 
 @csrf_exempt
 @require_http_methods(["POST"])
+def news_summary_by_id(request, news_id):
+    body = parse_json_body(request)
+    if body is None:
+        return error("INVALID_JSON", "요청 본문이 올바른 JSON 형식이 아닙니다.")
+
+    try:
+        result = summarize_news_by_id(
+            news_id,
+            fallback_title=body.get("title", ""),
+            fallback_content=body.get("content", ""),
+        )
+    except NewsSummarizerError as exc:
+        status = 400 if exc.default_code == "NEWS_SUMMARY_INPUT_ERROR" else 500
+        return error(exc.default_code, exc.message, status=status)
+
+    if result is None:
+        return error("NEWS_NOT_FOUND", "뉴스를 찾을 수 없습니다.", status=404)
+
+    return ok(
+        {
+            "news_id": result["news"].id,
+            "summary": result["summary"],
+            "cached": result["cached"],
+        }
+    )
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
 def news_summarize(request):
     body = parse_json_body(request)
     if body is None:
         return error("INVALID_JSON", "요청 본문이 올바른 JSON 형식이 아닙니다.")
+
+    news_id = body.get("news_id")
+    if news_id:
+        try:
+            result = summarize_news_by_id(
+                news_id,
+                fallback_title=body.get("title", ""),
+                fallback_content=body.get("content", ""),
+            )
+        except NewsSummarizerError as exc:
+            status = 400 if exc.default_code == "NEWS_SUMMARY_INPUT_ERROR" else 500
+            return error(exc.default_code, exc.message, status=status)
+
+        if result is None:
+            return error("NEWS_NOT_FOUND", "뉴스를 찾을 수 없습니다.", status=404)
+
+        return ok(
+            {
+                "news_id": result["news"].id,
+                "summary": result["summary"],
+                "cached": result["cached"],
+            }
+        )
 
     title = body.get("title", "")
     content = body.get("content", "")

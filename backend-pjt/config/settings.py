@@ -92,6 +92,16 @@ DATABASES = {
     }
 }
 
+DB_SSLMODE = os.environ.get('DB_SSLMODE', '')
+if DB_SSLMODE:
+    DATABASES['default']['OPTIONS'] = {'sslmode': DB_SSLMODE}
+    DATABASES['default']['DISABLE_SERVER_SIDE_CURSORS'] = True
+    DATABASES['default']['CONN_HEALTH_CHECKS'] = True
+
+DB_CHANNEL_BINDING = os.environ.get('DB_CHANNEL_BINDING', '')
+if DB_CHANNEL_BINDING:
+    DATABASES['default'].setdefault('OPTIONS', {})['channel_binding'] = DB_CHANNEL_BINDING
+
 # DATABASES = {
 #     'default': {
 #         'ENGINE': 'django.db.backends.postgresql',
