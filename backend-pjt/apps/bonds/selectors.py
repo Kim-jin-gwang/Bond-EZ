@@ -1,3 +1,4 @@
+from django.core.cache import cache
 from django.db.models import OuterRef, Q, Subquery
 
 from .models import Bond, BondMarketData, BondsMaster
@@ -22,7 +23,14 @@ DETAIL_MARKET_DATA_FIELDS = (
 
 
 def has_normal_bonds():
-    return Bond.objects.filter(deleted_at__isnull=True).exists()
+    cache_key = "bonds:has_normal_bonds"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    has_bonds = Bond.objects.filter(deleted_at__isnull=True).exists()
+    cache.set(cache_key, has_bonds, timeout=60)
+    return has_bonds
 
 
 def latest_market_data_annotations(fields):

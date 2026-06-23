@@ -35,6 +35,9 @@ def serialize_market_data(market_data):
         return None
 
     if isinstance(market_data, dict):
+        if market_data.get("id") is None:
+            return None
+
         return {
             "market_data_id": market_data.get("id"),
             "base_date": date_or_none(market_data.get("base_date")),
@@ -69,6 +72,9 @@ def serialize_list_market_data(market_data):
         return None
 
     if isinstance(market_data, dict):
+        if market_data.get("id") is None:
+            return None
+
         return {
             "market_data_id": market_data.get("id"),
             "base_date": date_or_none(market_data.get("base_date")),
@@ -93,10 +99,9 @@ def serialize_list_market_data(market_data):
 
 
 def get_latest_market_data(bond):
-    annotated_id = getattr(bond, "latest_market_data_id", None)
-    if annotated_id is not None:
+    if hasattr(bond, "latest_market_data_id"):
         return {
-            "id": annotated_id,
+            "id": bond.latest_market_data_id,
             "base_date": getattr(bond, "latest_market_data_base_date", None),
             "price": getattr(bond, "latest_market_data_price", None),
             "substitute_price": getattr(bond, "latest_market_data_substitute_price", None),
