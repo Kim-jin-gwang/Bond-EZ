@@ -45,11 +45,24 @@ def filtered_bonds(params):
 
         bond_type = params.get("bond_type")
         if bond_type:
-            queryset = queryset.filter(bond_type=bond_type)
+            if isinstance(bond_type, str) and "," in bond_type:
+                bond_type = [x.strip() for x in bond_type.split(",") if x.strip()]
+            if isinstance(bond_type, (list, tuple)):
+                queryset = queryset.filter(bond_type__in=bond_type)
+            else:
+                queryset = queryset.filter(bond_type=bond_type)
 
         rating_group = params.get("rating_group")
         if rating_group:
-            queryset = queryset.filter(credit_rating__startswith=rating_group)
+            if isinstance(rating_group, str) and "," in rating_group:
+                rating_group = [x.strip() for x in rating_group.split(",") if x.strip()]
+            if isinstance(rating_group, (list, tuple)):
+                q_obj = Q()
+                for rg in rating_group:
+                    q_obj |= Q(credit_rating__startswith=rg)
+                queryset = queryset.filter(q_obj)
+            else:
+                queryset = queryset.filter(credit_rating__startswith=rating_group)
 
         maturity_from = params.get("maturity_from")
         if maturity_from:
@@ -89,16 +102,67 @@ def filtered_bonds(params):
         "guarantee_status": "guarantee_status__guarantee_status",
         "option_type": "option_exercise__option_type",
         "interest_type": "interest_type",
-        "payment_cycle_months": "cashflow_rule__interest_payment_unit_months",
+        "payment_cycle_months": "payment_cycle_months",
     }
     for param, lookup in filter_map.items():
         value = params.get(param)
         if value:
-            queryset = queryset.filter(**{lookup: value})
+            if isinstance(value, str):
+                if "," in value:
+                    value = [x.strip() for x in value.split(",") if x.strip()]
+                elif value.strip():
+                    value = value.strip()
+
+            if isinstance(value, (list, tuple)):
+                if param == "payment_cycle_months":
+                    value = [int(x) for x in value if str(x).isdigit()]
+                elif param == "industry_id":
+                    value = [int(x) for x in value if str(x).isdigit()]
+                elif param == "option_type":
+                    mapped = []
+                    for opt in value:
+                        if opt in ("없음", "NONE", "옵션해당사항없음", "옵션해당 사항 없음"):
+                            mapped.append("옵션해당사항없음")
+                        else:
+                            mapped.append(opt)
+                    if "CALL" in mapped or "PUT" in mapped:
+                        mapped.append("CALL+PUT")
+                    value = list(set(mapped))
+
+                if param == "option_type" and "옵션해당사항없음" in value:
+                    queryset = queryset.filter(Q(option_exercise__option_type__in=value) | Q(option_exercise__isnull=True))
+                else:
+                    queryset = queryset.filter(**{f"{lookup}__in": value})
+            else:
+                if param == "payment_cycle_months" and str(value).isdigit():
+                    value = int(value)
+                elif param == "industry_id" and str(value).isdigit():
+                    value = int(value)
+                elif param == "option_type" and value in ("없음", "NONE", "옵션해당사항없음", "옵션해당 사항 없음"):
+                    value = "옵션해당사항없음"
+
+                if param == "option_type":
+                    if value == "옵션해당사항없음":
+                        queryset = queryset.filter(Q(option_exercise__option_type="옵션해당사항없음") | Q(option_exercise__isnull=True))
+                    elif value in ("CALL", "PUT"):
+                        queryset = queryset.filter(option_exercise__option_type__in=[value, "CALL+PUT"])
+                    else:
+                        queryset = queryset.filter(**{lookup: value})
+                else:
+                    queryset = queryset.filter(**{lookup: value})
 
     rating_group = params.get("rating_group")
     if rating_group:
-        queryset = queryset.filter(rating__rating_name__startswith=rating_group)
+        if isinstance(rating_group, str) and "," in rating_group:
+            rating_group = [x.strip() for x in rating_group.split(",") if x.strip()]
+
+        if isinstance(rating_group, (list, tuple)):
+            q_obj = Q()
+            for rg in rating_group:
+                q_obj |= Q(rating__rating_name__startswith=rg)
+            queryset = queryset.filter(q_obj)
+        else:
+            queryset = queryset.filter(rating__rating_name__startswith=rating_group)
 
     maturity_from = params.get("maturity_from")
     if maturity_from:
@@ -107,6 +171,22 @@ def filtered_bonds(params):
     maturity_to = params.get("maturity_to")
     if maturity_to:
         queryset = queryset.filter(maturity_date__lte=maturity_to)
+
+    min_coupon = params.get("min_coupon")
+    if min_coupon:
+        try:
+            min_val = float(min_coupon)
+            queryset = queryset.filter(coupon_rate__gte=min_val)
+        except (TypeError, ValueError):
+            pass
+
+    max_coupon = params.get("max_coupon")
+    if max_coupon:
+        try:
+            max_val = float(max_coupon)
+            queryset = queryset.filter(coupon_rate__lte=max_val)
+        except (TypeError, ValueError):
+            pass
 
     min_ytm = params.get("min_ytm")
     if min_ytm:

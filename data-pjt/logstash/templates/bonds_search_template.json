@@ -1,0 +1,69 @@
+{
+  "index_patterns": ["bonds_search*"],
+  "template": {
+    "settings": {
+      "analysis": {
+        "analyzer": {
+          "korean_search": {
+            "type": "custom",
+            "tokenizer": "nori_tokenizer",
+            "filter": ["lowercase"]
+          }
+        }
+      }
+    },
+    "mappings": {
+      "properties": {
+        "bond_id": { "type": "keyword" },
+        "isin_code": { "type": "keyword" },
+        "short_code": { "type": "keyword" },
+        "bond_name": {
+          "type": "text",
+          "analyzer": "korean_search",
+          "fields": {
+            "keyword": { "type": "keyword" },
+            "suggest": { "type": "search_as_you_type" }
+          }
+        },
+        "short_name": {
+          "type": "text",
+          "analyzer": "korean_search",
+          "fields": {
+            "keyword": { "type": "keyword" }
+          }
+        },
+        "issuer_name": {
+          "type": "text",
+          "analyzer": "korean_search",
+          "fields": {
+            "keyword": { "type": "keyword" }
+          }
+        },
+        "issuer_id": { "type": "keyword" },
+        "industry_id": { "type": "keyword" },
+        "industry_name": { "type": "keyword" },
+        "bond_type": { "type": "keyword" },
+        "rating_name": { "type": "keyword" },
+        "rating_group": { "type": "keyword" },
+        "seniority": { "type": "keyword" },
+        "guarantee_status": { "type": "keyword" },
+        "interest_type": { "type": "keyword" },
+        "payment_cycle_months": { "type": "integer" },
+        "option_type": { "type": "keyword" },
+        "issue_date": { "type": "date" },
+        "maturity_date": { "type": "date" },
+        "maturity_years": { "type": "double" },
+        "coupon_rate": { "type": "double" },
+        "next_exercise_date": { "type": "date" },
+        "market_data_id": { "type": "keyword" },
+        "market_base_date": { "type": "date" },
+        "price": { "type": "double" },
+        "ytm": { "type": "double" },
+        "trading_volume": { "type": "long" },
+        "bid_yield": { "type": "double" },
+        "ask_yield": { "type": "double" },
+        "price_change_rate": { "type": "double" }
+      }
+    }
+  }
+}

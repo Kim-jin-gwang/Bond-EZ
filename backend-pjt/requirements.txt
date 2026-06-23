@@ -7,3 +7,4 @@ langchain==0.3.27
 langchain-core==0.3.75
 langchain-google-genai==2.1.10
 langchain-openai==0.3.32
+elasticsearch==8.17.0

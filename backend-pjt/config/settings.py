@@ -150,3 +150,11 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+ELASTICSEARCH_HOSTS = [
+    host.strip()
+    for host in os.environ.get('ELASTICSEARCH_HOSTS', 'http://elasticsearch:9200').split(',')
+    if host.strip()
+]
+ELASTICSEARCH_BONDS_INDEX = os.environ.get('ELASTICSEARCH_BONDS_INDEX', 'bonds_search')
+ELASTICSEARCH_REQUEST_TIMEOUT = float(os.environ.get('ELASTICSEARCH_REQUEST_TIMEOUT', '2'))
