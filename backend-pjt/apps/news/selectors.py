@@ -1,10 +1,21 @@
+from django.core.cache import cache
 from django.db.models import Q
 
 from .models import News, NewsArticle
 
 
+def has_news_data():
+    cache_key = "news:has_data"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+    has_data = News.objects.filter(deleted_at__isnull=True).exists()
+    cache.set(cache_key, has_data, timeout=300)  # Cache for 5 minutes
+    return has_data
+
+
 def filtered_news(params):
-    if not News.objects.filter(deleted_at__isnull=True).exists():
+    if not has_news_data():
         queryset = NewsArticle.objects.all().order_by("-write_date", "-id")
 
         keyword = params.get("keyword")
@@ -50,7 +61,7 @@ def filtered_news(params):
 
 
 def get_news(news_id):
-    if not News.objects.filter(deleted_at__isnull=True).exists():
+    if not has_news_data():
         return NewsArticle.objects.filter(id=news_id).first()
 
     return (
