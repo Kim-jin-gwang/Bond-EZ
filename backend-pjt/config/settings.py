@@ -149,3 +149,11 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+NEWS_SUMMARY_LM_MODEL = os.environ.get('NEWS_SUMMARY_LM_MODEL', 'gemini/gemini-2.5-flash')
+NEWS_SUMMARY_LM_API_KEY = os.environ.get('NEWS_SUMMARY_LM_API_KEY', '')
+NEWS_SUMMARY_LM_TEMPERATURE = float(os.environ.get('NEWS_SUMMARY_LM_TEMPERATURE', '0.2'))
+NEWS_SUMMARY_LM_MAX_TOKENS = int(os.environ.get('NEWS_SUMMARY_LM_MAX_TOKENS', '512'))
+NEWS_SUMMARY_DSPY_PROGRAM_PATH = os.environ.get('NEWS_SUMMARY_DSPY_PROGRAM_PATH', '')
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')

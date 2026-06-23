@@ -1,10 +1,12 @@
-from django.views.decorators.http import require_GET
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_GET, require_http_methods
 
-from apps.common.responses import error, ok, paginated_response
+from apps.common.responses import error, ok, paginated_response, parse_json_body
 
 from .models import NewsProvider
 from .selectors import filtered_news, get_news
 from .serializers import serialize_news_detail, serialize_news_list_item, serialize_provider
+from .summarizer import NewsSummarizerError, summarize_news_content
 
 
 @require_GET
@@ -24,4 +26,28 @@ def news_detail(request, news_id):
 def provider_list(request):
     providers = NewsProvider.objects.filter(deleted_at__isnull=True).order_by("provider_name")
     return ok({"items": [serialize_provider(provider) for provider in providers]})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def news_summarize(request):
+    body = parse_json_body(request)
+    if body is None:
+        return error("INVALID_JSON", "요청 본문이 올바른 JSON 형식이 아닙니다.")
+
+    title = body.get("title", "")
+    content = body.get("content", "")
+    if not content:
+        return error(
+            "MISSING_REQUIRED_FIELD",
+            "content는 필수입니다.",
+            details={"fields": ["content"]},
+        )
+
+    try:
+        summary = summarize_news_content(title=title, content=content)
+    except NewsSummarizerError as exc:
+        return error(exc.default_code, exc.message, status=500)
+
+    return ok({"summary": summary})
 
