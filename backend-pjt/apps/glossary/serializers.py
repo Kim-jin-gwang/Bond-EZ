@@ -11,6 +11,7 @@ def serialize_term_list_item(term):
         "term_name": term.term_name,
         "difficulty": term.difficulty,
         "description": term.description,
+        "example_text": term.example_text,
         "category": serialize_category(term.category),
     }
 

@@ -1,6 +1,7 @@
 from django.views.decorators.http import require_GET
 
 from apps.common.responses import error, ok, paginated_response
+from apps.search.glossary import search_glossary
 
 from .models import GlossaryCategory
 from .selectors import filtered_terms, get_term
@@ -15,7 +16,11 @@ def category_list(request):
 
 @require_GET
 def glossary_list(request):
-    return paginated_response(filtered_terms(request.GET), request, serialize_term_list_item)
+    try:
+        payload = search_glossary(request.GET)
+        return ok(payload)
+    except Exception:
+        return paginated_response(filtered_terms(request.GET), request, serialize_term_list_item)
 
 
 @require_GET
