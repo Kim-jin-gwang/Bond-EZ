@@ -1,4 +1,4 @@
-from django.db.models import Prefetch, Q
+from django.db.models import OuterRef, Q, Subquery
 
 from .models import Bond, BondMarketData, BondsMaster
 
@@ -8,7 +8,10 @@ def has_normal_bonds():
 
 
 def base_bond_queryset():
-    latest_market_data = BondMarketData.objects.filter(deleted_at__isnull=True).order_by("-base_date")
+    latest_market_data = BondMarketData.objects.filter(
+        bond_id=OuterRef("pk"),
+        deleted_at__isnull=True,
+    ).order_by("-base_date")
 
     return (
         Bond.objects.filter(deleted_at__isnull=True)
@@ -22,8 +25,18 @@ def base_bond_queryset():
             "cashflow_rule",
             "option_exercise",
         )
-        .prefetch_related(
-            Prefetch("market_data", queryset=latest_market_data, to_attr="prefetched_latest_market_data")
+        .annotate(
+            latest_market_data_id=Subquery(latest_market_data.values("id")[:1]),
+            latest_market_data_base_date=Subquery(latest_market_data.values("base_date")[:1]),
+            latest_market_data_price=Subquery(latest_market_data.values("price")[:1]),
+            latest_market_data_substitute_price=Subquery(latest_market_data.values("substitute_price")[:1]),
+            latest_market_data_ytm=Subquery(latest_market_data.values("ytm")[:1]),
+            latest_market_data_duration=Subquery(latest_market_data.values("duration")[:1]),
+            latest_market_data_spread=Subquery(latest_market_data.values("spread")[:1]),
+            latest_market_data_trading_volume=Subquery(latest_market_data.values("trading_volume")[:1]),
+            latest_market_data_bid_yield=Subquery(latest_market_data.values("bid_yield")[:1]),
+            latest_market_data_ask_yield=Subquery(latest_market_data.values("ask_yield")[:1]),
+            latest_market_data_price_change_rate=Subquery(latest_market_data.values("price_change_rate")[:1]),
         )
     )
 
@@ -106,24 +119,24 @@ def filtered_bonds(params):
 
     min_ytm = params.get("min_ytm")
     if min_ytm:
-        queryset = queryset.filter(market_data__ytm__gte=min_ytm)
+        queryset = queryset.filter(latest_market_data_ytm__gte=min_ytm)
 
     max_ytm = params.get("max_ytm")
     if max_ytm:
-        queryset = queryset.filter(market_data__ytm__lte=max_ytm)
+        queryset = queryset.filter(latest_market_data_ytm__lte=max_ytm)
 
     ordering_map = {
         "maturity_asc": "maturity_date",
         "maturity_desc": "-maturity_date",
         "coupon_rate_desc": "-coupon_rate",
         "coupon_rate_asc": "coupon_rate",
-        "ytm_desc": "-market_data__ytm",
-        "ytm_asc": "market_data__ytm",
-        "trading_volume_desc": "-market_data__trading_volume",
-        "price_change_rate_desc": "-market_data__price_change_rate",
+        "ytm_desc": "-latest_market_data_ytm",
+        "ytm_asc": "latest_market_data_ytm",
+        "trading_volume_desc": "-latest_market_data_trading_volume",
+        "price_change_rate_desc": "-latest_market_data_price_change_rate",
     }
     ordering = ordering_map.get(params.get("sort"), "maturity_date")
-    return queryset.order_by(ordering, "id").distinct()
+    return queryset.order_by(ordering, "id")
 
 
 def get_bond(bond_id):

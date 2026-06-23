@@ -34,6 +34,21 @@ def serialize_market_data(market_data):
     if market_data is None:
         return None
 
+    if isinstance(market_data, dict):
+        return {
+            "market_data_id": market_data.get("id"),
+            "base_date": date_or_none(market_data.get("base_date")),
+            "price": number_or_none(market_data.get("price")),
+            "substitute_price": market_data.get("substitute_price"),
+            "ytm": number_or_none(market_data.get("ytm")),
+            "duration": number_or_none(market_data.get("duration")),
+            "spread": number_or_none(market_data.get("spread")),
+            "trading_volume": market_data.get("trading_volume"),
+            "bid_yield": number_or_none(market_data.get("bid_yield")),
+            "ask_yield": number_or_none(market_data.get("ask_yield")),
+            "price_change_rate": number_or_none(market_data.get("price_change_rate")),
+        }
+
     return {
         "market_data_id": market_data.id,
         "base_date": date_or_none(market_data.base_date),
@@ -50,9 +65,22 @@ def serialize_market_data(market_data):
 
 
 def get_latest_market_data(bond):
-    cached = getattr(bond, "prefetched_latest_market_data", None)
-    if cached is not None:
-        return cached[0] if cached else None
+    annotated_id = getattr(bond, "latest_market_data_id", None)
+    if annotated_id is not None:
+        return {
+            "id": annotated_id,
+            "base_date": getattr(bond, "latest_market_data_base_date", None),
+            "price": getattr(bond, "latest_market_data_price", None),
+            "substitute_price": getattr(bond, "latest_market_data_substitute_price", None),
+            "ytm": getattr(bond, "latest_market_data_ytm", None),
+            "duration": getattr(bond, "latest_market_data_duration", None),
+            "spread": getattr(bond, "latest_market_data_spread", None),
+            "trading_volume": getattr(bond, "latest_market_data_trading_volume", None),
+            "bid_yield": getattr(bond, "latest_market_data_bid_yield", None),
+            "ask_yield": getattr(bond, "latest_market_data_ask_yield", None),
+            "price_change_rate": getattr(bond, "latest_market_data_price_change_rate", None),
+        }
+
     return bond.market_data.filter(deleted_at__isnull=True).order_by("-base_date").first()
 
 
