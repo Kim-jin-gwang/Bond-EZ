@@ -49,7 +49,8 @@ def run_news_processor():
             'table-name' = 'news_article',
             'username' = '{POSTGRES_USER}',
             'password' = '{POSTGRES_PASSWORD}',
-            'sink.buffer-flush.max-rows' = '1'
+            'sink.buffer-flush.max-rows' = '50',
+            'sink.buffer-flush.interval' = '1s'
         )
     """)
 

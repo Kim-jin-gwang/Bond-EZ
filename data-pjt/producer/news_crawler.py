@@ -88,18 +88,35 @@ def scrape_einfomax():
 
 def main():
     print(f"Starting News Crawler. Sending to Kafka topic: {TOPIC_NAME}")
+    sent_urls = set()
     while True:
         naver_news = scrape_naver_finance()
         infomax_news = scrape_einfomax()
         
         all_news = naver_news + infomax_news
+        new_articles = []
         
         for news in all_news:
+            url = news.get('url')
+            if url and url not in sent_urls:
+                new_articles.append(news)
+                sent_urls.add(url)
+                
+        # Bounded cache size to prevent memory leaks
+        if len(sent_urls) > 1000:
+            # Keep only the last 500 URLs
+            sent_urls = set(list(sent_urls)[-500:])
+            
+        for news in new_articles:
             producer.send(TOPIC_NAME, news)
             print(f"Sent: {news['title']} ({news['source']})")
             
-        producer.flush()
-        print(f"Successfully sent {len(all_news)} articles. Sleeping for 60 seconds...")
+        if new_articles:
+            producer.flush()
+            print(f"Successfully sent {len(new_articles)} new articles. Sleeping for 60 seconds...")
+        else:
+            print("No new articles found. Sleeping for 60 seconds...")
+            
         time.sleep(60)
 
 if __name__ == "__main__":
