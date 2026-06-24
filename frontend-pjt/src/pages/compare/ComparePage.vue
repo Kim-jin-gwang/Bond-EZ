@@ -1,0 +1,573 @@
+<script setup>
+import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
+import { fetchBondCompare } from '../../api/bonds'
+
+const remoteCompareBonds = ref(null)
+const route = useRoute()
+
+const props = defineProps({
+  compareBonds: {
+    type: Array,
+    default: () => [],
+  },
+})
+
+const displayedBonds = computed(() => {
+  if (remoteCompareBonds.value?.length === 2) {
+    return remoteCompareBonds.value
+  }
+
+  if (props.compareBonds.length === 2) {
+    return props.compareBonds
+  }
+
+  return []
+})
+
+const hasComparisonData = computed(() => displayedBonds.value.length === 2)
+const leftBond = computed(() => displayedBonds.value[0] || {})
+const rightBond = computed(() => displayedBonds.value[1] || {})
+const compareTitle = computed(() => `${bondDisplayName(leftBond.value)} vs ${bondDisplayName(rightBond.value)}`)
+
+const compareSections = computed(() => [
+  {
+    title: '기본 정보',
+    caption: '종목 식별, 발행기관, 신용 구조',
+    rows: [
+      row('표준코드', 'code'),
+      row('단축코드', 'shortCode'),
+      row('종목약명', 'shortName'),
+      row('발행기관', 'issuer'),
+      row('산업', 'industry'),
+      row('채권종류', 'type'),
+      row('신용등급', 'rating', 'rating'),
+      row('선후순위', 'seniority'),
+      row('보증여부', 'guaranteeStatus'),
+    ],
+  },
+  {
+    title: '가격 및 수익률',
+    caption: '현재가, 매수/매도 수익률, 듀레이션',
+    rows: [
+      row('현재가', 'price'),
+      row('등락률', 'change', 'change'),
+      row('대용가격', 'substitutePrice'),
+      row('매수수익률', 'buyYield', 'higher'),
+      row('매도수익률', 'sellYield', 'higher'),
+      row('만기수익률(YTM)', 'ytm', 'higher'),
+      row('듀레이션', 'duration', 'lower'),
+      row('거래량', 'volume', 'higher-volume'),
+    ],
+  },
+  {
+    title: '발행 및 상환',
+    caption: '발행일, 만기일, 상환 방식',
+    rows: [
+      row('발행일', 'issueDate'),
+      row('상장일', 'listingDate'),
+      row('만기일', 'maturityDate'),
+      row('잔존만기', 'maturityYears', 'lower-year', '년'),
+      row('발행금액', 'issueAmount'),
+      row('대표주관회사', 'underwriter'),
+      row('상환방법', 'redemptionMethod'),
+      row('만기상환율', 'maturityRedemptionRate'),
+      row('특이상환조건', 'earlyRedemptionDescription'),
+    ],
+  },
+  {
+    title: '이자 지급 조건',
+    caption: '현금흐름 계산에 필요한 이자 규칙',
+    rows: [
+      row('이자방식', 'interestType'),
+      row('표면금리', 'coupon', 'higher'),
+      row('이자지급방법', 'interestPaymentMethod'),
+      row('지급주기', 'interestCycle'),
+      row('지급단위월수', 'interestPaymentUnitMonths', 'lower-month', '개월'),
+      row('이자계산월수', 'interestCalculationMonths', 'lower-month', '개월'),
+      row('선후급구분', 'interestPrePostType'),
+      row('최초이자지급일', 'firstInterestPaymentDate'),
+      row('이자지급기준', 'interestPaymentBasis'),
+      row('월말구분', 'interestMonthEndType'),
+    ],
+  },
+  {
+    title: '옵션 행사 정보',
+    caption: 'CALL/PUT 여부와 행사 가능일',
+    rows: [
+      row('옵션종류', 'option'),
+      customRow('1차 행사개시일', (bond) => bond.optionExercise?.startDate1 || '-'),
+      customRow('1차 행사종료일', (bond) => bond.optionExercise?.endDate1 || '-'),
+      customRow('2차 행사개시일', (bond) => bond.optionExercise?.startDate2 || '-'),
+      customRow('2차 행사종료일', (bond) => bond.optionExercise?.endDate2 || '-'),
+      customRow('행사사유', (bond) => bond.optionExercise?.reason || '-'),
+    ],
+  },
+])
+
+const quickJudgements = computed(() => [
+  {
+    label: '매수수익률 높음',
+    value: pickHigher(leftBond.value.yieldValue, rightBond.value.yieldValue),
+    helper: '두 채권 중 매수수익률 수치가 더 높습니다',
+    tone: 'return',
+  },
+  {
+    label: '잔존만기 짧음',
+    value: pickLower(leftBond.value.maturityYears, rightBond.value.maturityYears),
+    helper: '두 채권 중 잔존만기 수치가 더 짧습니다',
+    tone: 'stability',
+  },
+  {
+    label: '듀레이션 낮음',
+    value: pickLower(leftBond.value.durationValue, rightBond.value.durationValue),
+    helper: '두 채권 중 듀레이션 수치가 더 낮습니다',
+    tone: 'risk',
+  },
+])
+
+const gptSummary = computed(() => {
+  const higherYieldBond = leftBond.value.yieldValue >= rightBond.value.yieldValue ? leftBond.value : rightBond.value
+  const lowerDurationBond = leftBond.value.durationValue <= rightBond.value.durationValue ? leftBond.value : rightBond.value
+  const higherRatingBond = getHigherRatingSide(leftBond.value.rating, rightBond.value.rating) === 'right'
+    ? rightBond.value
+    : leftBond.value
+  const hasCallable = displayedBonds.value.filter((bond) => bond.optionType === 'CALL')
+
+  return {
+    headline: `두 채권은 수익률, 신용등급, 만기, 듀레이션, 옵션 조건에서 차이가 있으므로 투자 목적과 보유 기간에 맞춰 추가 확인이 필요합니다.`,
+    bullets: [
+      `${bondDisplayName(higherYieldBond)}의 매수수익률 수치가 ${higherYieldBond.buyYield}로 더 높게 표시됩니다. 수익률 수치가 높다는 사실은 신용위험, 유동성, 옵션 조건과 함께 해석해야 합니다.`,
+      `${bondDisplayName(lowerDurationBond)}의 듀레이션 수치가 ${lowerDurationBond.duration}로 더 낮게 표시됩니다. 듀레이션은 가격 변동 민감도를 보는 참고 지표 중 하나입니다.`,
+      `신용등급 표기는 ${bondDisplayName(higherRatingBond)}이 더 높은 등급으로 표시됩니다. 단, 신용등급은 원리금 상환을 보장하지 않으며 투자 적합성을 의미하지 않습니다.`,
+      hasCallable.length
+        ? `${hasCallable.map((bond) => bondDisplayName(bond)).join(', ')}은 CALL 옵션이 있으므로 행사 가능일, 조기상환 조건, 재투자 위험을 확인해야 합니다.`
+        : '두 채권 모두 별도 CALL 옵션 항목은 확인되지 않습니다.',
+    ],
+    conclusion: '이 화면은 투자 권유, 매수·매도 추천, 상품의 우수성 판단을 제공하지 않습니다. 표시된 내용은 입력된 데이터 기준의 단순 비교 정보이며, 수익률이 높거나 듀레이션이 낮다는 사실이 특정 채권의 적합성 또는 안정성을 의미하지 않습니다. 투자 전 투자설명서, 신용위험, 유동성, 만기, 세금 및 수수료를 반드시 확인하세요.',
+  }
+})
+
+function row(label, key, compareType = null, suffix = '') {
+  return {
+    label,
+    left: formatValue(leftBond.value[key], suffix),
+    right: formatValue(rightBond.value[key], suffix),
+  }
+}
+
+function customRow(label, getter) {
+  return {
+    label,
+    left: getter(leftBond.value),
+    right: getter(rightBond.value),
+  }
+}
+
+function formatValue(value, suffix = '') {
+  if (value === null || value === undefined || value === '') {
+    return '-'
+  }
+
+  return suffix ? `${value}${suffix}` : value
+}
+
+function bondDisplayName(bond) {
+  return bond?.shortName || bond?.name || bond?.code || '-'
+}
+
+function getHigherRatingSide(leftValue, rightValue) {
+  const order = ['국채', 'AAA', 'AA', 'A', 'BBB', 'BB', 'B']
+  const leftIndex = order.findIndex((item) => String(leftValue).startsWith(item))
+  const rightIndex = order.findIndex((item) => String(rightValue).startsWith(item))
+  if (leftIndex === rightIndex) return 'left'
+  if (leftIndex === -1) return 'right'
+  if (rightIndex === -1) return 'left'
+  return leftIndex < rightIndex ? 'left' : 'right'
+}
+
+function toNumber(value) {
+  return Number(String(value).replace(/[^0-9.-]/g, '')) || 0
+}
+
+function pickHigher(leftValue, rightValue) {
+  if (leftValue === rightValue) return '동일'
+  return leftValue > rightValue ? bondDisplayName(leftBond.value) : bondDisplayName(rightBond.value)
+}
+
+function pickLower(leftValue, rightValue) {
+  if (leftValue === rightValue) return '동일'
+  return leftValue < rightValue ? bondDisplayName(leftBond.value) : bondDisplayName(rightBond.value)
+}
+
+onMounted(async () => {
+  const queryIds = String(route.query.ids || '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean)
+  const ids = queryIds.length === 2 ? queryIds : props.compareBonds.map((bond) => bond.bondId).filter(Boolean)
+
+  if (ids.length !== 2) {
+    return
+  }
+
+  remoteCompareBonds.value = await fetchBondCompare(ids)
+})
+</script>
+
+<template>
+  <section v-if="hasComparisonData" class="page compare-page">
+    <div class="page-heading compact">
+      <p class="eyebrow">채권 비교</p>
+      <h1 class="compare-title">{{ compareTitle }}</h1>
+      <p>현재 ERD 기준의 발행정보, 시장 데이터, 이자 조건, 옵션 행사 정보를 나란히 비교합니다.</p>
+    </div>
+
+    <section class="compare-summary-grid">
+      <article v-for="bond in displayedBonds" :key="bond.code" class="compare-summary-card">
+        <div>
+          <span>{{ bond.code }} · {{ bond.shortCode }}</span>
+          <h2>{{ bond.name }}</h2>
+          <p>{{ bond.issuer }} · {{ bond.type }} · {{ bond.seniority }}</p>
+        </div>
+        <dl>
+          <div>
+            <dt>매수수익률</dt>
+            <dd>{{ bond.buyYield }}</dd>
+          </div>
+          <div>
+            <dt>신용등급</dt>
+            <dd>{{ bond.rating }}</dd>
+          </div>
+          <div>
+            <dt>옵션</dt>
+            <dd>{{ bond.option }}</dd>
+          </div>
+        </dl>
+      </article>
+    </section>
+
+    <section class="judgement-grid">
+      <article v-for="item in quickJudgements" :key="item.label" :class="item.tone">
+        <span class="criterion-label">비교 기준</span>
+        <span>{{ item.label }}</span>
+        <strong>{{ item.value }}</strong>
+        <small>{{ item.helper }}</small>
+      </article>
+    </section>
+
+    <section class="gpt-summary-panel">
+      <header>
+        <div>
+          <p class="eyebrow">Data Compare Summary</p>
+          <h2>데이터 비교 요약</h2>
+        </div>
+        <span>참고용</span>
+      </header>
+      <p class="summary-headline">{{ gptSummary.headline }}</p>
+      <ul>
+        <li v-for="item in gptSummary.bullets" :key="item">{{ item }}</li>
+      </ul>
+      <div class="summary-conclusion">
+        <strong>유의사항</strong>
+        <p>{{ gptSummary.conclusion }}</p>
+      </div>
+    </section>
+
+    <section v-for="section in compareSections" :key="section.title" class="compare-section">
+      <header>
+        <div>
+          <p class="eyebrow">{{ section.caption }}</p>
+          <h2>{{ section.title }}</h2>
+        </div>
+      </header>
+
+      <div class="compare-table professional-compare">
+        <div class="compare-row header">
+          <span>항목</span>
+          <strong>{{ bondDisplayName(leftBond) }}</strong>
+          <strong>{{ bondDisplayName(rightBond) }}</strong>
+        </div>
+        <div v-for="item in section.rows" :key="`${section.title}-${item.label}`" class="compare-row">
+          <span>{{ item.label }}</span>
+          <strong>{{ item.left }}</strong>
+          <strong>{{ item.right }}</strong>
+        </div>
+      </div>
+    </section>
+  </section>
+</template>
+
+<style scoped>
+.compare-page {
+  display: grid;
+  gap: 20px;
+}
+
+.compare-title {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: clamp(30px, 3.4vw, 46px);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compare-summary-grid,
+.judgement-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.compare-summary-card,
+.judgement-grid article,
+.gpt-summary-panel,
+.compare-section {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  box-shadow: var(--shadow);
+}
+
+.compare-summary-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
+  padding: 22px;
+}
+
+.compare-summary-card span,
+.compare-summary-card p,
+.compare-summary-card dt,
+.judgement-grid span,
+.judgement-grid small {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.compare-summary-card h2 {
+  margin: 8px 0;
+  font-size: 22px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+
+.compare-summary-card p {
+  margin: 0;
+}
+
+.compare-summary-card dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.compare-summary-card dl > div {
+  min-width: 0;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.compare-summary-card dt,
+.compare-summary-card dd {
+  margin: 0;
+}
+
+.compare-summary-card dd {
+  margin-top: 4px;
+  color: var(--primary-dark);
+  font-size: 18px;
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.judgement-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.judgement-grid article {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  overflow: hidden;
+  padding: 18px;
+}
+
+.judgement-grid article::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5px;
+  background: var(--primary);
+}
+
+.judgement-grid article.return::before {
+  background: var(--good);
+}
+
+.judgement-grid article.stability::before {
+  background: var(--primary);
+}
+
+.judgement-grid article.risk::before {
+  background: var(--accent);
+}
+
+.criterion-label {
+  width: fit-content;
+  border-radius: 4px;
+  padding: 3px 7px;
+  color: white !important;
+  background: var(--primary);
+  font-size: 11px !important;
+  font-weight: 900;
+}
+
+.judgement-grid article.return .criterion-label {
+  background: var(--good);
+}
+
+.judgement-grid article.risk .criterion-label {
+  background: var(--accent);
+}
+
+.judgement-grid strong {
+  color: var(--primary-dark);
+  font-size: 24px;
+}
+
+.gpt-summary-panel {
+  display: grid;
+  gap: 14px;
+  padding: 22px;
+  border-left: 5px solid var(--primary);
+}
+
+.gpt-summary-panel header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: start;
+}
+
+.gpt-summary-panel header h2,
+.gpt-summary-panel p,
+.gpt-summary-panel ul {
+  margin-bottom: 0;
+}
+
+.gpt-summary-panel header > span {
+  border-radius: 4px;
+  padding: 4px 8px;
+  color: var(--primary);
+  background: #e8f3f4;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.summary-headline {
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1.55;
+}
+
+.gpt-summary-panel ul {
+  display: grid;
+  gap: 8px;
+  padding-left: 20px;
+}
+
+.gpt-summary-panel li {
+  color: var(--text);
+  line-height: 1.6;
+  word-break: keep-all;
+}
+
+.summary-conclusion {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid #d7e7e9;
+  border-radius: 8px;
+  background: #f4fafb;
+}
+
+.summary-conclusion strong {
+  color: var(--primary-dark);
+}
+
+.summary-conclusion p {
+  line-height: 1.65;
+}
+
+.compare-section {
+  overflow: hidden;
+}
+
+.compare-section header {
+  padding: 20px 22px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.compare-section h2 {
+  margin-bottom: 0;
+}
+
+.professional-compare {
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.professional-compare .compare-row {
+  grid-template-columns: minmax(120px, 0.7fr) minmax(0, 1fr) minmax(0, 1fr);
+  min-height: 54px;
+  align-items: center;
+}
+
+.compare-row span,
+.compare-row strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+
+.compare-row strong {
+  font-size: 14px;
+}
+
+.compare-row.header strong {
+  color: var(--primary-dark);
+}
+
+@media (max-width: 920px) {
+  .compare-summary-grid,
+  .judgement-grid,
+  .compare-summary-card {
+    grid-template-columns: 1fr;
+  }
+
+  .compare-summary-card dl {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .professional-compare .compare-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .compare-row.header {
+    display: none;
+  }
+}
+</style>
