@@ -1,9 +1,10 @@
 from django.views.decorators.http import require_GET
 
+from apps.accounts.services import record_search_log
 from apps.common.responses import error, ok, paginated_response
 
 from .models import BondType, CreditRating, GuaranteeStatus, Industry, Seniority
-from .selectors import filtered_bonds, get_bond, get_bonds_for_compare, get_latest_market_data, market_data_history
+from .selectors import filtered_bonds, get_bond, get_bonds_for_compare, get_latest_market_data, market_data_history, get_curated_bonds
 from .serializers import (
     serialize_bond_compare_item,
     serialize_bond_detail,
@@ -15,7 +16,22 @@ from .serializers import (
 
 @require_GET
 def bond_list(request):
+    if not request.session.session_key:
+        request.session.create()
+    record_search_log(request.user, request.session.session_key, request.GET)
     return paginated_response(filtered_bonds(request.GET), request, serialize_bond_list_item)
+
+
+@require_GET
+def bond_curated(request):
+    if not request.session.session_key:
+        request.session.create()
+    limit_val = request.GET.get("limit")
+    limit = int(limit_val) if (limit_val and limit_val.isdigit()) else 10
+    curated = get_curated_bonds(request.user, request.session.session_key, limit=limit)
+    return ok({"items": [serialize_bond_list_item(bond) for bond in curated]})
+
+
 
 
 @require_GET

@@ -4,6 +4,7 @@ from . import views
 
 urlpatterns = [
     path("bonds", views.bond_list, name="bond-list"),
+    path("bonds/curated", views.bond_curated, name="bond-curated"),
     path("bonds/compare", views.bond_compare, name="bond-compare"),
     path("bonds/filter-options", views.bond_filter_options, name="bond-filter-options"),
     path("bonds/<str:bond_id>", views.bond_detail, name="bond-detail"),

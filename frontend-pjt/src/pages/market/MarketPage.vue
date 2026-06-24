@@ -1,8 +1,9 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { BOND_PAGE_SIZE, fetchBonds, fetchFilterOptions } from '../../api/bonds'
+import { BOND_PAGE_SIZE, fetchBonds, fetchFilterOptions, fetchCuratedBonds } from '../../api/bonds'
 import { createEmptyBondFilters } from '../../composables/useBondFilter'
 import { useDebouncedRef } from '../../composables/useDebouncedRef'
+import { useAppStore } from '../../stores/app'
 
 const emit = defineEmits(['navigate'])
 
@@ -13,6 +14,8 @@ const props = defineProps({
   },
 })
 
+const appStore = useAppStore()
+const isCuratedMode = ref(false)
 const filtersOpen = ref(false)
 const searchInput = ref(props.marketSearch?.keyword || '')
 const searchKeyword = useDebouncedRef(searchInput)
@@ -121,6 +124,7 @@ const canCompare = computed(() => selectedBondCodes.value.length === 2)
 
 watch(() => props.marketSearch, (newVal) => {
   if (newVal) {
+    isCuratedMode.value = newVal.source === 'curated'
     searchInput.value = newVal.keyword || ''
     if (newVal.filters) {
       selectedFilters.value = {
@@ -201,7 +205,21 @@ async function loadBonds() {
   error.value = null
 
   try {
-    const result = await fetchBonds(buildBondParams())
+    let result
+    if (isCuratedMode.value) {
+      const items = await fetchCuratedBonds({ limit: 50 })
+      result = {
+        items: items,
+        page: {
+          number: 1,
+          size: items.length,
+          totalElements: items.length,
+          totalPages: 1,
+        }
+      }
+    } else {
+      result = await fetchBonds(buildBondParams())
+    }
     if (activeRequest !== requestId) return
     bonds.value = result.items
     pageInfo.value = result.page
@@ -336,7 +354,27 @@ async function loadFilterOptions() {
   }
 }
 
+async function handleFavoriteToggle(bondId) {
+  if (!appStore.isLoggedIn) {
+    alert('관심 채권 등록은 로그인이 필요한 서비스입니다.')
+    return
+  }
+  try {
+    await appStore.toggleFavorite(bondId)
+  } catch (err) {
+    console.error('Failed to toggle favorite:', err)
+  }
+}
+
+function clearCuratedMode() {
+  isCuratedMode.value = false
+  loadBonds()
+}
+
 onMounted(() => {
+  if (props.marketSearch?.source === 'curated') {
+    isCuratedMode.value = true
+  }
   loadFilterOptions()
   loadBonds()
 })
@@ -415,10 +453,18 @@ onMounted(() => {
       </div>
     </section>
 
+    <div v-if="isCuratedMode" class="curated-banner">
+      <div class="banner-content">
+        <span class="banner-icon">✨</span>
+        <span><strong>나의 맞춤 추천 채권</strong>을 골라 보았어요.</span>
+        <button class="btn-clear-curated" type="button" @click="clearCuratedMode">전체 채권 보기</button>
+      </div>
+    </div>
+
     <div class="toolbar market-toolbar">
       <div class="market-info">
-        <p class="eyebrow">전체 채권 시세</p>
-        <h1 aria-live="polite">{{ pageInfo.totalElements }}개의 채권이 검색되었습니다</h1>
+        <p class="eyebrow">{{ isCuratedMode ? '맞춤 큐레이션 추천 채권' : '전체 채권 시세' }}</p>
+        <h1 aria-live="polite">{{ isCuratedMode ? '나에게 맞춰 큐레이션된 추천 채권이 ' + bonds.length + '개 있습니다' : pageInfo.totalElements + '개의 채권이 검색되었습니다' }}</h1>
         <p class="selection-help">비교할 채권을 최대 2개까지 선택하세요. 현재 {{ selectedBondCodes.length }}/2개 선택</p>
       </div>
       <button
@@ -458,6 +504,7 @@ onMounted(() => {
             <th>옵션/행사일</th>
             <th>만기/이자</th>
             <th>상세</th>
+            <th>즐겨찾기</th>
           </tr>
         </thead>
         <tbody>
@@ -497,10 +544,23 @@ onMounted(() => {
               <strong>{{ bond.maturity }}</strong>
               <span class="nowrap">{{ bond.interestCycle }} · {{ bond.interestType }}</span>
             </td>
-            <td class="action-cell"><button class="small-action" type="button" @click="$emit('navigate', 'detail', { bond })">상세정보</button></td>
+            <td class="action-cell">
+              <button class="small-action" type="button" @click="$emit('navigate', 'detail', { bond })">상세정보</button>
+            </td>
+            <td class="favorite-cell">
+              <button 
+                class="btn-favorite" 
+                type="button" 
+                @click="handleFavoriteToggle(bond.bondId)"
+                :class="{ active: appStore.isFavorite(bond.bondId) }"
+                title="관심 채권 등록/해제"
+              >
+                {{ appStore.isFavorite(bond.bondId) ? '★' : '☆' }}
+              </button>
+            </td>
           </tr>
           <tr v-if="!isLoading && visibleBonds.length === 0">
-            <td colspan="10" class="empty-cell">
+            <td colspan="11" class="empty-cell">
               <div class="empty-msg">
                 <p>조건에 맞는 채권이 없습니다.</p>
                 <button type="button" @click="resetFilters">필터 초기화하기</button>
@@ -767,34 +827,37 @@ tr.selected {
 
 .market-page th:nth-child(2),
 .market-page td:nth-child(2) {
-  width: 18%;
+  width: 17%;
 }
 
 .market-page th:nth-child(3),
 .market-page td:nth-child(3) {
-  width: 14%;
+  width: 12%;
 }
 
 .market-page th:nth-child(4),
 .market-page td:nth-child(4) {
-  width: 14%;
+  width: 12%;
 }
 
 .market-page th:nth-child(5),
-.market-page td:nth-child(5),
+.market-page td:nth-child(5) {
+  width: 8%;
+}
+
 .market-page th:nth-child(6),
 .market-page td:nth-child(6) {
-  width: 8%;
+  width: 7%;
 }
 
 .market-page th:nth-child(7),
 .market-page td:nth-child(7) {
-  width: 10%;
+  width: 11%;
 }
 
 .market-page th:nth-child(8),
 .market-page td:nth-child(8) {
-  width: 11%;
+  width: 10%;
 }
 
 .market-page th:nth-child(9),
@@ -807,4 +870,80 @@ tr.selected {
   width: 8%;
 }
 
+.market-page th:nth-child(11),
+.market-page td:nth-child(11) {
+  width: 6%;
+}
+
+.favorite-cell {
+  text-align: center;
+}
+
+.curated-banner {
+  background: linear-gradient(90deg, #eff6ff 0%, #dbeafe 100%);
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 12px 18px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.05);
+}
+
+.banner-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #1e40af;
+  font-size: 14px;
+}
+
+.banner-icon {
+  font-size: 16px;
+}
+
+.btn-clear-curated {
+  background: white;
+  border: 1px solid #3b82f6;
+  color: #3b82f6;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-weight: 800;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-clear-curated:hover {
+  background: #3b82f6;
+  color: white;
+}
+
+.action-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.btn-favorite {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  color: #cbd5e1;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.btn-favorite:hover {
+  transform: scale(1.25);
+  color: #fbbf24;
+}
+
+.btn-favorite.active {
+  color: #fbbf24;
+}
 </style>

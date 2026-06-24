@@ -1,6 +1,6 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
-import { fetchBonds, fetchFilterOptions } from '../../api/bonds'
+import { computed, onMounted, ref, watch } from 'vue'
+import { fetchBonds, fetchFilterOptions, fetchCuratedBonds } from '../../api/bonds'
 import { fetchIndicators } from '../../api/indicators'
 import { createEmptyBondFilters } from '../../composables/useBondFilter'
 
@@ -174,20 +174,19 @@ function normalizeCreditLabel(value) {
   return label.replace(/[+-]$/, '').replace(/\d+$/, '')
 }
 
-const curatedBonds = computed(() => {
-  if (!props.isLoggedIn) {
-    return bonds.value.slice(0, 4)
-  }
+const curatedBonds = ref([])
 
-  if (props.user.type === '안정추구형') {
-    return bonds.value.filter((bond) => bond.type === '국채' || bond.ratingGroup === 'AAA').slice(0, 4)
+async function loadCuratedBonds() {
+  try {
+    const items = await fetchCuratedBonds()
+    curatedBonds.value = items || []
+  } catch (err) {
+    console.error('Failed to load curated bonds:', err)
   }
+}
 
-  if (props.user.type === '공격투자형') {
-    return [...bonds.value].sort((a, b) => b.yieldValue - a.yieldValue).slice(0, 4)
-  }
-
-  return bonds.value.slice(0, 4)
+watch(() => props.isLoggedIn, () => {
+  loadCuratedBonds()
 })
 
 function cloneFilters() {
@@ -323,6 +322,8 @@ onMounted(async () => {
 
   bonds.value = remoteBonds.items || []
   indicators.value = remoteIndicators
+
+  await loadCuratedBonds()
 })
 </script>
 
@@ -500,41 +501,43 @@ onMounted(async () => {
       <div class="section-title">
         <div>
           <p class="eyebrow">Curated Bonds</p>
-          <h2 v-if="!isLoggedIn">초보 투자자가 먼저 볼 만한 채권</h2>
+          <h2 v-if="!isLoggedIn">관심있을만한 채권이에요</h2>
           <h2 v-else>
-            <span class="user-highlight">{{ user.name }}</span> 님의
-            <span class="type-highlight">{{ user.type }}</span> 성향 추천
+            <span class="user-highlight">{{ user.name }}</span>님이 관심있을만한 채권이에요
           </h2>
         </div>
-        <button type="button" @click="$emit('navigate', 'market')">전체 보기</button>
+        <button type="button" @click="$emit('navigate', 'market', { source: 'curated' })">전체 보기</button>
       </div>
       <div v-if="!isLoggedIn" class="guest-prompt">
         <p>로그인하면 투자 성향과 관심 조건에 맞춘 채권 후보를 더 정교하게 볼 수 있습니다.</p>
         <button class="btn-login-link" type="button" @click="$emit('navigate', 'profile')">로그인</button>
       </div>
-      <div class="swipe-row">
-        <article v-for="bond in curatedBonds" :key="bond.code" class="bond-card-mini">
-          <div class="card-header">
-            <span class="type-tag">{{ bond.type }}</span>
-            <span class="rating-tag" :class="bond.ratingGroup">{{ bond.rating }}</span>
-          </div>
-          <h3>{{ bond.name }}</h3>
-          <dl class="bond-meta">
-            <div>
-              <dt>만기</dt>
-              <dd>{{ bond.maturity }}</dd>
+      
+      <div class="curated-list">
+        <div v-if="curatedBonds.length === 0" class="empty-curated">
+          추천 채권 데이터를 불러오고 있습니다.
+        </div>
+        <article v-else v-for="bond in curatedBonds.slice(0, 10)" :key="bond.code" class="curated-bond-item">
+          <div class="bond-item-row" @click="$emit('navigate', 'detail', { bond })">
+            <div class="bond-item-main">
+              <div class="bond-item-meta">
+                <span class="type-tag">{{ bond.type }}</span>
+                <span class="rating-tag" :class="bond.ratingGroup">{{ bond.rating }}</span>
+              </div>
+              <strong class="bond-item-title">{{ bond.name }}</strong>
+              <div class="bond-item-details">
+                <span>만기: <strong>{{ bond.maturity }}</strong></span>
+                <span>이자 주기: <strong>{{ bond.interestCycle }}</strong></span>
+                <span>표면 금리: <strong>{{ bond.coupon }}</strong></span>
+              </div>
             </div>
-            <div>
-              <dt>이자 주기</dt>
-              <dd>{{ bond.interestCycle }}</dd>
+            <div class="bond-item-action">
+              <div class="yield-badge">
+                <span class="label">매수수익률</span>
+                <span class="value">{{ bond.buyYield }}</span>
+              </div>
+              <button class="btn-more-detail" type="button">상세정보</button>
             </div>
-          </dl>
-          <div class="card-footer">
-            <div class="yield-info">
-              <span class="label">매수수익률</span>
-              <span class="value">{{ bond.buyYield }}</span>
-            </div>
-            <button class="btn-more" type="button" @click="$emit('navigate', 'detail', { bond })">상세</button>
           </div>
         </article>
       </div>
@@ -949,6 +952,154 @@ onMounted(async () => {
   .guide-actions,
   .guide-actions button {
     width: 100%;
+  }
+}
+
+.curated-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.empty-curated {
+  padding: 32px 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.curated-bond-item {
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 8px;
+  background: #fbfdff;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.curated-bond-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(23, 43, 59, 0.06);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.bond-item-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  gap: 20px;
+  cursor: pointer;
+}
+
+.bond-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.bond-item-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.bond-item-meta .type-tag,
+.bond-item-meta .rating-tag {
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.bond-item-meta .type-tag {
+  color: var(--muted);
+  background: var(--surface-soft);
+}
+
+.bond-item-meta .rating-tag.AAA { color: #1f5f9f; background: #ebf3fb; }
+.bond-item-meta .rating-tag.AA { color: #127c57; background: #e7f6f0; }
+.bond-item-meta .rating-tag.A { color: #d98c31; background: #fff7ec; }
+.bond-item-meta .rating-tag.BBB { color: #b42318; background: #fef2f2; }
+
+.bond-item-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text, #1e293b);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bond-item-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.bond-item-details span strong {
+  color: var(--text);
+}
+
+.bond-item-action {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.bond-item-action .yield-badge {
+  display: flex;
+  flex-direction: column;
+  text-align: right;
+}
+
+.bond-item-action .yield-badge .label {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.bond-item-action .yield-badge .value {
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--primary);
+}
+
+.btn-more-detail {
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 14px;
+  color: var(--text);
+  background: white;
+  font-weight: 800;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-more-detail:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+@media (max-width: 768px) {
+  .bond-item-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .bond-item-action {
+    justify-content: space-between;
+    border-top: 1px solid var(--line);
+    padding-top: 10px;
+    width: 100%;
+  }
+  .bond-item-action .yield-badge {
+    text-align: left;
   }
 }
 </style>

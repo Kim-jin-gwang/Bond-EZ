@@ -35,14 +35,14 @@ export async function apiGet(path, options = {}) {
 
 export async function apiPost(path, body = {}, options = {}) {
   const response = await fetch(buildUrl(path, options.params), {
-    method: 'POST',
+    method: options.method || 'POST',
     credentials: 'include',
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/json',
       ...options.headers,
     },
-    body: JSON.stringify(body),
+    body: body ? JSON.stringify(body) : undefined,
   })
   const payload = await parseJson(response)
 
@@ -52,6 +52,11 @@ export async function apiPost(path, body = {}, options = {}) {
 
   return payload?.data ?? payload
 }
+
+export async function apiDelete(path, options = {}) {
+  return apiPost(path, null, { ...options, method: 'DELETE' })
+}
+
 
 function buildUrl(path, params = null) {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`
