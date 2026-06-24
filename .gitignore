@@ -28,3 +28,9 @@ data-pjt/airflow/dags/spark_checkpoints/**
 
 data-pjt/elasticsearch_data
 data-pjt/logstash/state/
+
+# Python virtual environment & PPT assets
+.venv/
+generate_ppt.py
+*.pptx
+
