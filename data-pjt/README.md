@@ -637,6 +637,74 @@ source ~/venvs/data-pjt/bin/activate
 pip install -r requirements.txt
 ```
 
+### 8.1. 금리/예금금리 적재 스크립트 실행
+
+`producer/interest_rate_loader.py`는 ECOS 기준금리/국고채 금리, FRED 미국 기준금리/미국채 금리, 금융감독원 12개월 예금상품 금리를 PostgreSQL에 적재합니다.
+
+`.env`에 다음 값을 설정합니다.
+
+```text
+ECOS_API_KEY=한국은행_ECOS_API_KEY
+FSS_API_KEY=금융감독원_금융상품통합비교공시_API_KEY
+POSTGRES_DB=bonds_db
+POSTGRES_USER=ssafyuser
+POSTGRES_PASSWORD=ssafy
+DB_HOST=localhost
+DB_PORT=5432
+```
+
+호스트 PC에서 실행할 때는 다음 명령을 사용합니다.
+
+```bash
+python producer/interest_rate_loader.py --only all
+```
+
+기준금리/국채금리를 10년치 기간 데이터로 다시 적재하려면 다음 명령을 사용합니다.
+
+```bash
+python producer/interest_rate_loader.py --only base-rate --days-back 3650
+```
+
+위 명령은 한국 데이터는 ECOS, 미국 데이터는 FRED에서 가져옵니다. 미국 금리는 `DFF`(연방기금금리), `DGS3`(미국채 3년물), `DGS10`(미국채 10년물)을 사용하며, `BaseRate`에는 국가별/기준일별로 적재됩니다.
+
+예금상품 금리만 적재하려면 다음 명령을 사용합니다.
+
+```bash
+python producer/interest_rate_loader.py --only deposit-rate
+```
+
+금리와 예금상품 금리를 모두 적재하려면 다음 명령을 사용합니다.
+
+```bash
+python producer/interest_rate_loader.py --only all --days-back 3650
+```
+
+이미 생성된 DB에 기간 데이터를 넣기 전에는 `BaseRate` 테이블에 기준일 컬럼을 추가해야 합니다.
+
+```bash
+docker exec -i postgres psql -U ssafyuser -d bonds_db < data-pjt/postgres/migrations/002_base_rate_history.sql
+```
+
+컨테이너 내부에서 실행할 때는 `DB_HOST=db`를 사용합니다.
+
+### 8.2. Airflow 매일 자동 업데이트
+
+`interest_rate_daily_update_dag`는 매일 오전 7시(Asia/Seoul)에 최근 14일 금리 데이터와 예금상품 금리를 다시 적재합니다. 최근 14일을 조회하는 이유는 미국 FRED/Fed 데이터가 영업일 기준으로 늦게 공개될 수 있어 누락된 날짜를 upsert로 보완하기 위해서입니다.
+
+Airflow 실행 전 `.env`에 `ECOS_API_KEY`, `FSS_API_KEY`가 설정되어 있어야 합니다. 이미 생성된 DB라면 `BaseRate` 기간 적재용 migration도 먼저 적용합니다.
+
+```bash
+docker exec -i postgres psql -U ssafyuser -d bonds_db < data-pjt/postgres/migrations/002_base_rate_history.sql
+```
+
+Airflow를 실행합니다.
+
+```bash
+docker compose up -d airflow-init airflow-webserver airflow-scheduler
+```
+
+Airflow UI는 기본 설정 기준 `http://localhost:8081`에서 확인할 수 있습니다. DAG 목록에서 `interest_rate_daily_update_dag`를 활성화하거나 수동 실행하면 됩니다.
+
 예를 들어 PostgreSQL, Kafka, RSS, HTML 파싱 등을 사용할 경우 `requirements.txt`에는 다음과 같은 라이브러리가 포함될 수 있습니다.
 
 ```text
