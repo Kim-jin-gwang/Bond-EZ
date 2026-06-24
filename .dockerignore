@@ -9,3 +9,9 @@ __pycache__/
 *.pyc
 .env
 .git/
+
+# Python virtual environment & PPT assets
+.venv/
+generate_ppt.py
+*.pptx
+

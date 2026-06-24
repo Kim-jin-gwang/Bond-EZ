@@ -40,3 +40,9 @@ images/pipeline_architecture_hadoop.png
 # Spark checkpoints
 data-pjt/airflow/dags/spark_checkpoints/**
 !data-pjt/airflow/dags/spark_checkpoints/**/.gitkeep
+
+# Python virtual environment & PPT assets
+.venv/
+generate_ppt.py
+*.pptx
+
