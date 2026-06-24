@@ -2,6 +2,9 @@
 import { computed, h, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { fetchBondDetail } from '../../api/bonds'
+import { useAppStore } from '../../stores/app'
+
+const appStore = useAppStore()
 
 const props = defineProps({
   selectedBond: {
@@ -275,6 +278,7 @@ watch(() => props.selectedBond, (bond) => {
     Object.assign(selectedBond, bond)
     purchasePrice.value = selectedBond.priceValue
     setScenarioDate('maturity')
+    appStore.addRecentBond(bond)
   }
 })
 
@@ -290,6 +294,7 @@ onMounted(async () => {
     Object.assign(selectedBond, bond)
     purchasePrice.value = selectedBond.priceValue
     setScenarioDate('maturity')
+    appStore.addRecentBond(bond)
   }
 })
 
@@ -355,6 +360,18 @@ function formatNumber(value) {
 function formatCurrency(value) {
   return `${formatNumber(value)}원`
 }
+
+async function handleFavoriteToggle(bondId) {
+  if (!appStore.isLoggedIn) {
+    alert('관심 채권 등록은 로그인이 필요한 서비스입니다.')
+    return
+  }
+  try {
+    await appStore.toggleFavorite(bondId)
+  } catch (err) {
+    console.error('Failed to toggle favorite:', err)
+  }
+}
 </script>
 
 <template>
@@ -364,6 +381,17 @@ function formatCurrency(value) {
         <p class="eyebrow">Bond Detail</p>
         <h1>{{ selectedBond.name }}</h1>
         <p>{{ summaryMetaText }}</p>
+        <div class="favorite-action-wrap">
+          <button 
+            class="btn-favorite-detail" 
+            type="button" 
+            @click="handleFavoriteToggle(selectedBond.bondId)"
+            :class="{ active: appStore.isFavorite(selectedBond.bondId) }"
+            title="관심 채권 등록/해제"
+          >
+            {{ appStore.isFavorite(selectedBond.bondId) ? '★' : '☆' }}
+          </button>
+        </div>
       </div>
 
       <div class="summary-metrics">
@@ -955,5 +983,32 @@ function formatCurrency(value) {
     align-items: start;
     flex-direction: column;
   }
+}
+
+.favorite-action-wrap {
+  margin-top: 16px;
+}
+
+.btn-favorite-detail {
+  background: none;
+  border: none;
+  color: #cbd5e1;
+  font-size: 32px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  transition: transform 0.2s ease, color 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-favorite-detail:hover {
+  transform: scale(1.25);
+  color: #fbbf24;
+}
+
+.btn-favorite-detail.active {
+  color: #fbbf24;
 }
 </style>

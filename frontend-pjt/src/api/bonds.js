@@ -1,5 +1,5 @@
 import { cachedQuery } from './cache'
-import { apiGet } from './client'
+import { apiGet, apiPost, apiDelete } from './client'
 
 export const BOND_PAGE_SIZE = 20
 
@@ -23,6 +23,36 @@ export function fetchBonds(params = {}) {
     return normalizePaginatedResponse(payload, normalizeBond)
   })
 }
+
+export function fetchCuratedBonds(params = {}) {
+  const cacheKey = `bonds:curated:${JSON.stringify(params)}`
+
+  return cachedQuery(cacheKey, async () => {
+    try {
+      const payload = await apiGet('/bonds/curated', { params, raw: true })
+      const items = payload?.data?.items || payload?.items || []
+      return items.map(normalizeBond)
+    } catch {
+      return []
+    }
+  })
+}
+
+export async function fetchFavorites() {
+  const data = await apiGet('/me/favorites')
+  const items = data?.items || data || []
+  return items.map(normalizeBond)
+}
+
+export async function addFavorite(bondId) {
+  const data = await apiPost('/me/favorites', { bond_id: bondId })
+  return data ? normalizeBond(data) : null
+}
+
+export function removeFavorite(bondId) {
+  return apiDelete(`/me/favorites/${bondId}`)
+}
+
 
 export function fetchBondDetail(bondId) {
   return cachedQuery(`bonds:detail:${bondId}`, async () => {

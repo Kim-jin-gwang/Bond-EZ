@@ -31,3 +31,24 @@ class UserBond(models.Model):
     def __str__(self):
         return f"{self.user_id}:{self.bond_id}"
 
+
+class FavoriteBond(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="favorite_bonds")
+    bond = models.ForeignKey(Bond, on_delete=models.CASCADE, related_name="favorite_bonds", db_constraint=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+    class Meta:
+        db_table = "favorite_bond"
+        constraints = [
+            models.UniqueConstraint(fields=["user", "bond"], name="uniq_user_favorite_bond")
+        ]
+        indexes = [
+            models.Index(fields=["user"]),
+            models.Index(fields=["bond"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user_id} likes {self.bond_id}"
+
+

@@ -255,3 +255,220 @@ def market_data_history(bond_id, params):
         queryset = queryset.filter(base_date__lte=date_to)
 
     return queryset.order_by("base_date")
+
+
+def get_curated_bonds(user, session_key, limit=10):
+    from apps.accounts.models import UserSearchLog
+    import collections
+
+    # 1. Fetch search logs and favorite bonds
+    logs = UserSearchLog.objects.none()
+    favorites = []
+    if user and user.is_authenticated:
+        logs = UserSearchLog.objects.filter(user=user)
+        from apps.portfolios.models import FavoriteBond
+        favorites = list(FavoriteBond.objects.filter(user=user).select_related("bond"))
+    elif session_key:
+        logs = UserSearchLog.objects.filter(session_key=session_key)
+        
+    logs = logs.order_by("-created_at")[:20]  # Get last 20 search logs
+    
+    # 2. Build User Preference Profile
+    keywords = []
+    min_coupon_values = []
+    max_coupon_values = []
+    rating_groups = []
+    bond_types = []
+    
+    # Process favorites first (give them high priority)
+    for fav in favorites:
+        bond = fav.bond
+        bond_coupon = float(bond.coupon_rate) if bond.coupon_rate is not None else None
+        if bond_coupon is not None:
+            min_coupon_values.extend([bond_coupon, bond_coupon])
+            
+        bond_rating = bond.rating.rating_name if (hasattr(bond, 'rating') and bond.rating) else getattr(bond, 'credit_rating', '')
+        if bond_rating:
+            rating_groups.extend([bond_rating, bond_rating])
+            
+        bond_type_name = bond.bond_type.bond_type if (hasattr(bond, 'bond_type') and bond.bond_type) else getattr(bond, 'bond_type', '')
+        if bond_type_name:
+            bond_types.extend([bond_type_name, bond_type_name])
+            
+        if bond.bond_name:
+            keywords.append(bond.bond_name.lower())
+
+    for log in logs:
+        if log.keyword:
+            keywords.append(log.keyword.lower())
+        filters = log.filters or {}
+        
+        # coupon rate
+        if "min_coupon" in filters:
+            try:
+                min_coupon_values.append(float(filters["min_coupon"]))
+            except (ValueError, TypeError):
+                pass
+        if "max_coupon" in filters:
+            try:
+                max_coupon_values.append(float(filters["max_coupon"]))
+            except (ValueError, TypeError):
+                pass
+                
+        # ratings
+        if "rating_group" in filters:
+            rg = filters["rating_group"]
+            if isinstance(rg, list):
+                rating_groups.extend(rg)
+            else:
+                rating_groups.append(rg)
+        elif "credit_rating" in filters:
+            cr = filters["credit_rating"]
+            if isinstance(cr, list):
+                rating_groups.extend(cr)
+            else:
+                rating_groups.append(cr)
+                
+        # bond type
+        if "bond_type" in filters:
+            bt = filters["bond_type"]
+            if isinstance(bt, list):
+                bond_types.extend(bt)
+            else:
+                bond_types.append(bt)
+
+    # Calculate Profile Averages/Modes
+    pref_coupon = None
+    if min_coupon_values:
+        pref_coupon = sum(min_coupon_values) / len(min_coupon_values)
+    elif max_coupon_values:
+        pref_coupon = sum(max_coupon_values) / len(max_coupon_values)
+        
+    # Count frequencies
+    rating_counter = collections.Counter(rating_groups)
+    bond_type_counter = collections.Counter(bond_types)
+    
+    total_ratings = sum(rating_counter.values()) or 1
+    total_bond_types = sum(bond_type_counter.values()) or 1
+    
+    # Standard Fallback: if no logs and no favorites exist
+    if not logs.exists() and not favorites:
+        if not has_normal_bonds():
+            queryset = BondsMaster.objects.all().order_by("-credit_rating", "-coupon_rate")
+        else:
+            queryset = base_bond_queryset().order_by("rating__rating_order", "-coupon_rate")
+        if limit:
+            queryset = queryset[:limit]
+        return list(queryset)
+
+
+    # Get active bonds
+    has_normal = has_normal_bonds()
+    if not has_normal:
+        bond_values = list(BondsMaster.objects.all().values(
+            "id", "isin_code", "bond_name", "company_name", "credit_rating", "coupon_rate", "bond_type"
+        ))
+    else:
+        bond_values = list(
+            Bond.objects.filter(deleted_at__isnull=True).values(
+                "id",
+                "isin_code",
+                "bond_name",
+                "coupon_rate",
+                "issuer__issuer_name",
+                "bond_type__bond_type",
+                "rating__rating_name",
+                "rating__rating_order",
+            )
+        )
+
+    scored_bonds = []
+    for bv in bond_values:
+        score = 0.0
+        
+        # 1. Coupon Matching (30 points max)
+        coupon_val = bv.get("coupon_rate")
+        bond_coupon = float(coupon_val) if coupon_val is not None else 0.0
+        if pref_coupon is not None:
+            diff = abs(bond_coupon - pref_coupon)
+            if bond_coupon >= pref_coupon:
+                score += min(30, 25 + (bond_coupon - pref_coupon) * 2)
+            else:
+                score += max(0, 30 - diff * 8)
+        else:
+            score += min(30, bond_coupon * 5)
+
+        # 2. Credit Rating Matching (30 points max)
+        if has_normal:
+            bond_rating = bv.get("rating__rating_name") or ""
+        else:
+            bond_rating = bv.get("credit_rating") or ""
+            
+        rating_score = 0.0
+        for rg, count in rating_counter.items():
+            weight = count / total_ratings
+            if bond_rating.startswith(rg) or rg.startswith(bond_rating):
+                rating_score += 30.0 * weight
+                
+        if total_ratings == 1 and not rating_groups:
+            if has_normal:
+                rating_order = bv.get("rating__rating_order")
+                rating_order = rating_order if rating_order is not None else 10
+            else:
+                rating_order = 10
+            rating_score = max(0, 30 - rating_order * 2)
+        score += rating_score
+
+        # 3. Bond Type Matching (20 points max)
+        if has_normal:
+            bond_type_name = bv.get("bond_type__bond_type") or ""
+        else:
+            bond_type_name = bv.get("bond_type") or ""
+            
+        bond_type_score = 0.0
+        for bt, count in bond_type_counter.items():
+            weight = count / total_bond_types
+            if bond_type_name == bt:
+                bond_type_score += 20.0 * weight
+        if total_bond_types == 1 and not bond_types:
+            bond_type_score = 15.0
+        score += bond_type_score
+
+        # 4. Keyword Relevancy (20 points max)
+        keyword_score = 0.0
+        if keywords:
+            bond_name_val = bv.get("bond_name")
+            bond_name_lower = bond_name_val.lower() if bond_name_val else ""
+            if has_normal:
+                issuer_name_val = bv.get("issuer__issuer_name")
+                issuer_name_lower = issuer_name_val.lower() if issuer_name_val else ""
+            else:
+                issuer_name_val = bv.get("company_name")
+                issuer_name_lower = issuer_name_val.lower() if issuer_name_val else ""
+                
+            for kw in keywords:
+                if kw in bond_name_lower or kw in issuer_name_lower:
+                    keyword_score = 20.0
+                    break
+        score += keyword_score
+
+        key_val = bv.get("id") if has_normal else bv.get("isin_code")
+        scored_bonds.append((key_val, score, bond_coupon))
+
+    # Sort by score desc, then by coupon desc
+    scored_bonds.sort(key=lambda x: (-x[1], -x[2]))
+    
+    if limit:
+        top_keys = [sb[0] for sb in scored_bonds[:limit]]
+    else:
+        top_keys = [sb[0] for sb in scored_bonds]
+
+    if not has_normal:
+        full_bonds = BondsMaster.objects.filter(isin_code__in=top_keys)
+        bond_map = {b.isin_code: b for b in full_bonds}
+        return [bond_map[k] for k in top_keys if k in bond_map]
+    else:
+        full_bonds = base_bond_queryset().filter(id__in=top_keys)
+        bond_map = {b.id: b for b in full_bonds}
+        return [bond_map[k] for k in top_keys if k in bond_map]
+
