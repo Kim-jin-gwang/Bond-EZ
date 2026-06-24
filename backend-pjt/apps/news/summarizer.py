@@ -115,11 +115,17 @@ def build_lm(dspy):
             "NEWS_SUMMARY_LM_MODEL과 해당 API 키(OPENAI_API_KEY 또는 GEMINI_API_KEY)를 설정해 주세요."
         )
 
+    kwargs = {
+        "temperature": getattr(settings, "NEWS_SUMMARY_LM_TEMPERATURE", 0.2),
+        "max_tokens": getattr(settings, "NEWS_SUMMARY_LM_MAX_TOKENS", 512),
+    }
+    if model.startswith("gemini/") and api_key and not api_key.startswith("AIzaSy"):
+        kwargs["api_base"] = "https://gms.ssafy.io/gmsapi/generativelanguage.googleapis.com/v1beta"
+
     return dspy.LM(
         model,
         api_key=api_key,
-        temperature=getattr(settings, "NEWS_SUMMARY_LM_TEMPERATURE", 0.2),
-        max_tokens=getattr(settings, "NEWS_SUMMARY_LM_MAX_TOKENS", 512),
+        **kwargs
     )
 
 

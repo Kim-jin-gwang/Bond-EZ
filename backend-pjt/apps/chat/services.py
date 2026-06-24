@@ -45,7 +45,7 @@ def _build_langchain_messages(history, question):
 
 
 def _try_gemini_answer(history, question):
-    api_key = os.environ.get("GOOGLE_API_KEY")
+    api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         return None
 
@@ -63,12 +63,16 @@ def _try_gemini_answer(history, question):
 
     for model in dict.fromkeys(candidate for candidate in model_candidates if candidate):
         try:
-            llm = ChatGoogleGenerativeAI(
-                model=model,
-                temperature=0.2,
-                google_api_key=api_key,
-                max_retries=0,
-            )
+            kwargs = {
+                "model": model,
+                "temperature": 0.2,
+                "google_api_key": api_key,
+                "max_retries": 0,
+            }
+            if api_key and not api_key.startswith("AIzaSy"):
+                kwargs["transport"] = "rest"
+                kwargs["client_options"] = {"api_endpoint": "https://gms.ssafy.io/gmsapi/generativelanguage.googleapis.com"}
+            llm = ChatGoogleGenerativeAI(**kwargs)
             response = llm.invoke(_build_langchain_messages(history, question))
             return response.content
         except Exception:
@@ -127,7 +131,7 @@ def _fallback_answer(question):
         )
 
     return (
-        "현재는 LangChain MessageHistory가 붙은 개발용 챗봇 상태입니다. "
-        "GOOGLE_API_KEY와 Gemini/LangChain 의존성을 설정하면 같은 세션의 이전 대화 맥락을 참고해 답변할 수 있습니다. "
-        "RAG 문서 검색은 다음 단계에서 채권 문서 chunk와 pgvector 검색을 연결하면 됩니다."
+        "현재는 임시 규칙 기반 답변(Fallback)을 제공하고 있습니다. "
+        "GEMINI_API_KEY를 환경 변수에 설정해 주시면, "
+        "Gemini 2.5 Flash 모델이 대화 흐름을 파악하여 훨씬 더 똑똑하고 유연하게 답변해 드립니다."
     )

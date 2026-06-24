@@ -175,7 +175,10 @@ def build_teacher_prompt(batch):
 
 
 def call_gemini(model, api_key, prompt):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    if api_key and not api_key.strip().startswith("AIzaSy"):
+        url = f"https://gms.ssafy.io/gmsapi/generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    else:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
