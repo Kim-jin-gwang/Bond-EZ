@@ -144,6 +144,7 @@ function normalizeBond(item) {
     yieldValue: toNumber(market.bid_yield, base.yieldValue),
     sellYield: formatPercent(market.ask_yield, '시세 없음'),
     ytm: formatPercent(market.ytm, '시세 없음'),
+    ytmValue: toNumber(market.ytm, base.ytmValue),
     duration: formatYears(market.duration, '시세 없음'),
     durationValue: toNumber(market.duration, base.durationValue),
     rating: valueOrName(item?.credit_rating || basic.credit_rating, base.rating),
