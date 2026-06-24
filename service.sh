@@ -98,20 +98,26 @@ if [ ! -f ".env" ]; then
   fi
 fi
 
+# 0. 네트워크 자동 생성 (docker-compose.yml에서 external로 명시되어 있으므로, 미리 생성되어 있어야 함)
+docker network inspect de_net >/dev/null 2>&1 || {
+  info "Creating de_net network..."
+  docker network create de_net
+}
+docker network inspect web_net >/dev/null 2>&1 || {
+  info "Creating web_net network..."
+  docker network create web_net
+}
+
 # 1. 전체 프로젝트 빌드
 info "Building application Docker images..."
 $COMPOSE build
 
-# 2. 인프라 서비스 먼저 실행 (DB, Elasticsearch, Kibana)
-info "Starting infrastructure services (DB, Elasticsearch, Kibana)..."
-$COMPOSE up -d db elasticsearch kibana
+# 2. 인프라 서비스 먼저 실행 (Elasticsearch, Kibana)
+info "Starting infrastructure services (Elasticsearch, Kibana)..."
+$COMPOSE up -d elasticsearch kibana
 
-# 3. DB 준비 대기
-info "Waiting for database to be healthy..."
-wait_for_healthy "$DB_SERVICE"
-
-# 4. 애플리케이션 서비스 실행 (Backend, Frontend)
-info "Starting Django backend and Vue frontend..."
+# 3. 애플리케이션 및 동기화 서비스 실행 (Backend, Frontend, Logstash)
+info "Starting Django backend, Vue frontend, and Logstash..."
 $COMPOSE up -d
 
 # 5. Django 마이그레이션 적용

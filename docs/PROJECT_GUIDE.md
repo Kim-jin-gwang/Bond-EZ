@@ -21,12 +21,12 @@ graph TD
         kibana[Kibana UI]
         backend[Django Backend]
         frontend[Vue Frontend]
+        logstash[Logstash]
     end
 
     subgraph Pipeline_Compose [데이터 파이프라인 - docker-compose-data.yml]
         zookeeper[Zookeeper]
         kafka[Kafka Broker]
-        logstash[Logstash]
         namenode[Hadoop NameNode]
         datanode[Hadoop DataNode]
         spark_master[Spark Master]
@@ -119,12 +119,12 @@ graph TD
 ## ⚙️ 상세 스크립트 설명
 
 ### 1. `service.sh`
-*   **역할**: 애플리케이션 서비스 인스턴스 빌드 및 핵심 백본 인프라 기동.
+*   **역할**: 애플리케이션 서비스 및 동기화/검색 인프라 빌드 및 기동.
 *   **핵심 동작**:
     1. `.env` 파일 존재 여부 확인 (없으면 `.env.example` 복사본 생성)
     2. `docker-compose.yml` 리소스를 통한 이미지 빌드
     3. `db`, `elasticsearch`, `kibana` 구동 및 `db`가 `healthy` 상태가 될 때까지 대기
-    4. `backend`, `frontend` 구동
+    4. `backend`, `frontend`, `logstash` 구동 (데이터 동기화 포함)
     5. Django Migration 실행 (`manage.py migrate`)
 
 ### 2. `data.sh`
@@ -133,7 +133,7 @@ graph TD
     1. 외부 도커 네트워크 `de_net`, `web_net` 생성 여부 검사 및 미존재 시 자동 생성
     2. 다른 컴포즈 세션의 `db` 컨테이너 작동 여부 감지 및 미구동 시 자동 기동 (`db`, `elasticsearch` 인프라만 구동)
     3. `zookeeper`, `kafka`, `namenode`, `datanode` 1차 기동
-    4. Airflow, Spark, Flink, News-crawler, Logstash 2차 기동
+    4. Airflow, Spark, Flink, News-crawler 2차 기동 (Logstash는 application 영역에서 관리)
     5. `news-crawler`를 이용한 기초 Glossary DB 데이터 로드
     6. `namenode` HDFS 컨테이너 내부에 `/raw/bonds`, `/raw/news` 데이터 디렉토리 강제 초기화
 

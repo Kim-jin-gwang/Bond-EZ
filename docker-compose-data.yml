@@ -1,25 +1,4 @@
 services:
-  logstash:
-    build:
-      context: ./data-pjt/logstash
-      dockerfile: Dockerfile.logstash
-    container_name: logstash
-    restart: always
-    env_file:
-      - .env
-    environment:
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-      - ELASTICSEARCH_BONDS_INDEX=${ELASTICSEARCH_BONDS_INDEX:-bonds_search}
-      - JDBC_CONNECTION_STRING=jdbc:postgresql://${DB_HOST:-db}:${DB_PORT:-5432}/${POSTGRES_DB}?sslmode=require
-      - JDBC_USER=${POSTGRES_USER}
-      - JDBC_PASSWORD=${POSTGRES_PASSWORD}
-    volumes:
-      - ./data-pjt/logstash/pipeline:/usr/share/logstash/pipeline:ro
-      - ./data-pjt/logstash/templates:/usr/share/logstash/templates:ro
-      - ./data-pjt/logstash/state:/usr/share/logstash/state
-    networks:
-      - de_net
-
   # --- Kafka ---
   zookeeper:
     image: confluentinc/cp-zookeeper:7.4.0

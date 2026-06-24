@@ -24,6 +24,21 @@ command_exists() {
   command -v "$1" >/dev/null 2>&1
 }
 
+# .env에서 값을 읽어오는 헬퍼 함수
+get_env_value() {
+  key="$1"
+  default="$2"
+  if [ -f ".env" ]; then
+    value="$(grep -E "^${key}=" .env 2>/dev/null | tail -n 1 | cut -d '=' -f 2- || true)"
+    value="$(printf '%s' "$value" | tr -d '"' | tr -d "'")"
+    if [ -n "$value" ]; then
+      printf '%s' "$value"
+      return
+    fi
+  fi
+  printf '%s' "$default"
+}
+
 # DB처럼 healthcheck가 있는 서비스가 준비될 때까지 기다립니다.
 # 다른 docker-compose.yml에 있는 컨테이너 상태를 확인합니다.
 wait_for_healthy_app_service() {
@@ -35,9 +50,9 @@ wait_for_healthy_app_service() {
   container_id="$($COMPOSE_APP ps -q "$service" 2>/dev/null || true)"
   if [ -z "$container_id" ]; then
     info "Database container for service '$service' is not running."
-    info "Starting required infrastructure (db, elasticsearch) automatically..."
-    if ! $COMPOSE_APP up -d db elasticsearch; then
-      error "Failed to start database and elasticsearch services."
+    info "Starting database container automatically..."
+    if ! $COMPOSE_APP up -d "$service"; then
+      error "Failed to start database service."
       exit 1
     fi
     container_id="$($COMPOSE_APP ps -q "$service" 2>/dev/null || true)"
@@ -102,9 +117,24 @@ docker network inspect web_net >/dev/null 2>&1 || {
 }
 
 # 1. 데이터 파이프라인 DB 및 인프라 상태 확인 대기
-# Airflow 및 flink 등이 구동되기 위해서는 postgres(db)가 필요하므로 dev.sh가 켜져 있는지 확인하고 wait
-info "Checking if database is ready..."
-wait_for_healthy_app_service "$DB_SERVICE"
+DB_HOST="$(get_env_value "DB_HOST" "db")"
+
+# Elasticsearch 상태 확인 및 자동 구동
+es_container_id="$($COMPOSE_APP ps -q elasticsearch 2>/dev/null || true)"
+if [ -z "$es_container_id" ]; then
+  info "Elasticsearch container is not running. Starting elasticsearch automatically..."
+  if ! $COMPOSE_APP up -d elasticsearch; then
+    error "Failed to start Elasticsearch service."
+    exit 1
+  fi
+fi
+
+if [ "$DB_HOST" = "db" ]; then
+  info "Checking if database is ready..."
+  wait_for_healthy_app_service "$DB_SERVICE"
+else
+  info "Using external database at '$DB_HOST'. Skipping local database container check."
+fi
 
 # 2. 데이터 파이프라인 이미지 빌드
 info "Building data pipeline Docker images..."
@@ -114,7 +144,7 @@ $COMPOSE_DATA build
 info "Starting pipeline infrastructure services (Zookeeper, Kafka, Hadoop HDFS)..."
 $COMPOSE_DATA up -d zookeeper kafka namenode datanode
 
-# 4. 나머지 파이프라인 서비스 실행 (Airflow, Spark, Flink, News Crawler, Logstash)
+# 4. 나머지 파이프라인 서비스 실행 (Airflow, Spark, Flink, News Crawler)
 info "Starting all remaining data pipeline services..."
 $COMPOSE_DATA up -d
 

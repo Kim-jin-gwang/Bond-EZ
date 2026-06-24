@@ -32,28 +32,6 @@ services:
       - de_net
       - web_net
 
-  db:
-    container_name: postgres
-    image: pgvector/pgvector:pg16
-    restart: always
-    stdin_open: true
-    tty: true
-    volumes:
-      - ./data-pjt/postgres_data:/var/lib/postgresql/data
-      - ./data-pjt/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 10s
-      timeout: 10s
-      retries: 5
-      start_period: 20s
-    env_file:
-      - .env
-    ports:
-      - "${DB_PORT:-5432}:5432"
-    networks:
-      - de_net
-
   # --- Application Services ---
   backend:
     build:
@@ -73,9 +51,6 @@ services:
       - ELASTICSEARCH_HOSTS=${ELASTICSEARCH_HOSTS:-http://elasticsearch:9200}
       - ELASTICSEARCH_BONDS_INDEX=${ELASTICSEARCH_BONDS_INDEX:-bonds_search}
     command: python manage.py runserver 0.0.0.0:8000
-    depends_on:
-      db:
-        condition: service_healthy
     networks:
       - de_net
       - web_net
@@ -98,10 +73,29 @@ services:
     networks:
       - web_net
 
+  logstash:
+    build:
+      context: ./data-pjt/logstash
+      dockerfile: Dockerfile.logstash
+    container_name: logstash
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_BONDS_INDEX=${ELASTICSEARCH_BONDS_INDEX:-bonds_search}
+      - JDBC_CONNECTION_STRING=jdbc:postgresql://${DB_HOST:-db}:${DB_PORT:-5432}/${POSTGRES_DB}?sslmode=require
+      - JDBC_USER=${POSTGRES_USER}
+      - JDBC_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - ./data-pjt/logstash/pipeline:/usr/share/logstash/pipeline:ro
+      - ./data-pjt/logstash/templates:/usr/share/logstash/templates:ro
+      - ./data-pjt/logstash/state:/usr/share/logstash/state
+    networks:
+      - de_net
+
 networks:
   de_net:
-    name: de_net
-    driver: bridge
+    external: true
   web_net:
-    name: web_net
-    driver: bridge
+    external: true
