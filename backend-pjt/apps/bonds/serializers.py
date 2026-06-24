@@ -197,9 +197,18 @@ def serialize_bond_list_item(bond):
 
 
 def serialize_bond_detail(bond):
+    from apps.glossary.selectors import terms_in_text
+
+    from .utils import generate_rule_based_summary
+
+    summary = generate_rule_based_summary(bond)
+    summary_terms = terms_in_text(" ".join(summary))
+
     if is_master_bond(bond):
         return {
             "bond_id": bond.isin_code,
+            "summary": summary,
+            "summary_terms": summary_terms,
             "basic_info": {
                 "isin_code": bond.isin_code,
                 "short_code": None,
@@ -249,6 +258,8 @@ def serialize_bond_detail(bond):
 
     return {
         "bond_id": bond.id,
+        "summary": summary,
+        "summary_terms": summary_terms,
         "basic_info": {
             "isin_code": bond.isin_code,
             "short_code": bond.short_code,

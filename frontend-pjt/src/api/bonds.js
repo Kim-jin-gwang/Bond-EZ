@@ -94,6 +94,8 @@ function normalizeBond(item) {
 
   return {
     bondId: normalizeId(basic.bond_id || item?.bond_id || item?.id || base.bondId),
+    summary: item?.summary || [],
+    summaryTerms: item?.summary_terms || [],
     name: basic.bond_name || item?.bond_name || base.name,
     shortName: basic.short_name || item?.short_name || basic.bond_name || item?.bond_name || base.shortName,
     code: basic.isin_code || item?.isin_code || base.code,

@@ -119,6 +119,27 @@ const summaryMetrics = computed(() => [
   { label: '다음 옵션일', value: displayValue(selectedBond.optionExercise?.startDate1) },
 ])
 
+const summaryLines = computed(() =>
+  (selectedBond.summary || []).map((line) => tokenizeSummaryLine(line)),
+)
+
+const summaryTermMap = computed(() => {
+  const entries = (selectedBond.summaryTerms || [])
+    .filter((term) => term?.term_name && term?.description)
+    .map((term) => [term.term_name.toLocaleLowerCase(), term])
+
+  return new Map(entries)
+})
+
+const summaryTermPattern = computed(() => {
+  const names = [...summaryTermMap.value.values()]
+    .map((term) => term.term_name)
+    .sort((a, b) => b.length - a.length)
+
+  if (!names.length) return null
+  return new RegExp(`(${names.map(escapeRegExp).join('|')})`, 'gi')
+})
+
 const issueRows = computed(() => [
   ['표준코드', displayValue(selectedBond.code), '단축코드', displayValue(selectedBond.shortCode)],
   ['종목명', displayValue(selectedBond.name), '종목약명', displayValue(selectedBond.shortName)],
@@ -355,6 +376,60 @@ function formatNumber(value) {
 function formatCurrency(value) {
   return `${formatNumber(value)}원`
 }
+
+function tokenizeSummaryLine(line) {
+  const text = String(line || '')
+  const chunks = []
+  const boldPattern = /\*\*(.*?)\*\*/g
+  let cursor = 0
+  let match
+
+  while ((match = boldPattern.exec(text)) !== null) {
+    if (match.index > cursor) chunks.push(...annotateTerms(text.slice(cursor, match.index), false))
+    chunks.push(...annotateTerms(match[1], true))
+    cursor = boldPattern.lastIndex
+  }
+
+  if (cursor < text.length) chunks.push(...annotateTerms(text.slice(cursor), false))
+  return chunks
+}
+
+function annotateTerms(text, bold) {
+  const pattern = summaryTermPattern.value
+  if (!pattern || !text) return [{ text, bold, term: null }]
+
+  pattern.lastIndex = 0
+  const chunks = []
+  let cursor = 0
+  let match
+
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > cursor) {
+      chunks.push({ text: text.slice(cursor, match.index), bold, term: null })
+    }
+
+    chunks.push({
+      text: match[0],
+      bold,
+      term: summaryTermMap.value.get(match[0].toLocaleLowerCase()) || null,
+    })
+    cursor = pattern.lastIndex
+  }
+
+  if (cursor < text.length) chunks.push({ text: text.slice(cursor), bold, term: null })
+  return chunks
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function tooltipDescription(value) {
+  const description = String(value || '').replace(/\s+/g, ' ').trim()
+  const firstSentence = description.match(/^.*?[.!?](?:\s|$)/)?.[0]?.trim() || description
+
+  return firstSentence.length > 220 ? `${firstSentence.slice(0, 217)}...` : firstSentence
+}
 </script>
 
 <template>
@@ -372,6 +447,37 @@ function formatCurrency(value) {
           <strong>{{ metric.value }}</strong>
         </article>
       </div>
+    </section>
+
+    <section v-if="selectedBond.summary && selectedBond.summary.length" class="bond-key-summary">
+      <div class="summary-header">
+        <span class="ai-badge">채권 핵심 요약</span>
+        <span class="summary-disclaimer">※ 본 정보는 공식 채권 상세 내역을 기반으로 자동 조립된 참고용 정보입니다.</span>
+      </div>
+      <ul class="summary-list">
+        <li v-for="(segments, lineIndex) in summaryLines" :key="lineIndex">
+          <template v-for="(segment, segmentIndex) in segments" :key="`${lineIndex}-${segmentIndex}`">
+            <span
+              v-if="segment.term"
+              class="glossary-term"
+              tabindex="0"
+              :aria-describedby="`summary-term-${lineIndex}-${segmentIndex}`"
+            >
+              <span :class="{ 'summary-emphasis': segment.bold }">{{ segment.text }}</span>
+              <span
+                :id="`summary-term-${lineIndex}-${segmentIndex}`"
+                class="glossary-tooltip"
+                role="tooltip"
+              >
+                <strong>{{ segment.term.term_name }}</strong>
+                <span>{{ tooltipDescription(segment.term.description) }}</span>
+              </span>
+            </span>
+            <strong v-else-if="segment.bold" class="summary-emphasis">{{ segment.text }}</strong>
+            <template v-else>{{ segment.text }}</template>
+          </template>
+        </li>
+      </ul>
     </section>
 
     <section class="detail-grid">
@@ -917,6 +1023,111 @@ function formatCurrency(value) {
 
 .cashflow-grid td:nth-child(-n + 4) {
   text-align: left;
+}
+
+.bond-key-summary {
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--primary);
+  border-radius: 8px;
+  padding: 20px 24px;
+  background: linear-gradient(135deg, rgba(31, 111, 120, 0.03), rgba(255, 255, 255, 0.95)), var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.summary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 10px;
+}
+
+.ai-badge {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--primary-dark);
+}
+
+.summary-disclaimer {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.summary-list {
+  margin: 0;
+  padding-left: 20px;
+  list-style-type: disc;
+}
+
+.summary-list li {
+  margin-bottom: 10px;
+  color: var(--text);
+  font-size: 14.5px;
+  line-height: 1.6;
+}
+
+.summary-list li:last-child {
+  margin-bottom: 0;
+}
+
+.summary-emphasis {
+  font-weight: 700;
+  color: var(--primary-dark);
+  background: rgba(31, 111, 120, 0.06);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+.glossary-term {
+  position: relative;
+  border-bottom: 1px dotted var(--primary);
+  color: inherit;
+  cursor: help;
+  outline: none;
+}
+
+.glossary-term:focus-visible {
+  border-radius: 2px;
+  box-shadow: 0 0 0 2px rgba(31, 111, 120, 0.2);
+}
+
+.glossary-tooltip {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  bottom: calc(100% + 9px);
+  display: grid;
+  width: max-content;
+  max-width: min(320px, calc(100vw - 48px));
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(18, 42, 47, 0.16);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.glossary-tooltip strong {
+  margin-bottom: 3px;
+  color: var(--primary-dark);
+  font-size: 13px;
+}
+
+.glossary-term:hover .glossary-tooltip,
+.glossary-term:focus .glossary-tooltip,
+.glossary-term:focus-within .glossary-tooltip {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 @media (max-width: 1100px) {
