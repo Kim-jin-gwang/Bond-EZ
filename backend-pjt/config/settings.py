@@ -39,6 +39,14 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'apps.accounts',
+    'apps.bonds',
+    'apps.chat',
+    'apps.glossary',
+    'apps.indicators',
+    'apps.mainpage',
+    'apps.news',
+    'apps.portfolios',
 ]
 
 MIDDLEWARE = [
@@ -85,6 +93,22 @@ DATABASES = {
     }
 }
 
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': os.environ.get('POSTGRES_DB', 'postgres'),
+#         'USER': os.environ.get('POSTGRES_USER', 'postgres'),
+#         'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'postgres'),
+#         'HOST': os.environ.get('DB_HOST', 'db'),
+#         'PORT': os.environ.get('DB_PORT', '5432'),
+#         'OPTIONS': {
+#             'sslmode': 'require',
+#         },
+#         'DISABLE_SERVER_SIDE_CURSORS': True,
+#         'CONN_HEALTH_CHECKS': True,
+#     }
+# }
+
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -108,9 +132,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'ko-kr'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Seoul'
 
 USE_I18N = True
 
@@ -126,3 +150,12 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+ELASTICSEARCH_HOSTS = [
+    host.strip()
+    for host in os.environ.get('ELASTICSEARCH_HOSTS', 'http://elasticsearch:9200').split(',')
+    if host.strip()
+]
+ELASTICSEARCH_BONDS_INDEX = os.environ.get('ELASTICSEARCH_BONDS_INDEX', 'bonds_search')
+ELASTICSEARCH_GLOSSARY_INDEX = os.environ.get('ELASTICSEARCH_GLOSSARY_INDEX', 'glossary_search')
+ELASTICSEARCH_REQUEST_TIMEOUT = float(os.environ.get('ELASTICSEARCH_REQUEST_TIMEOUT', '2'))

@@ -1,2 +1,42 @@
+# Data files
+*.csv
+*.pdf
+
 .env
 postgres_data
+
+# Airflow logs and temp files
+data-pjt/airflow/logs/
+data-pjt/airflow/plugins/__pycache__/
+data-pjt/airflow/dags/__pycache__/
+
+# PostgreSQL actual data
+data-pjt/postgres_data/
+
+# Data files
+*.csv
+*.pdf
+
+.env
+postgres_data
+
+# Airflow logs and temp files
+data-pjt/airflow/logs/
+data-pjt/airflow/plugins/__pycache__/
+data-pjt/airflow/dags/__pycache__/
+
+# PostgreSQL actual data
+data-pjt/postgres_data/
+
+# Python cache
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+images/pipeline_architecture_hadoop.png
+
+# Spark checkpoints
+data-pjt/airflow/dags/spark_checkpoints/**
+!data-pjt/airflow/dags/spark_checkpoints/**/.gitkeep
+
+data-pjt/elasticsearch_data
+data-pjt/logstash/state/
