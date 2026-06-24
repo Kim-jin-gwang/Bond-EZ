@@ -2,7 +2,7 @@ from django.db import transaction
 
 from .article_fetcher import fetch_article_content
 from .models import News, NewsArticle
-from .summarizer import NewsSummaryInputError, summarize_news_content
+from .summarizer import NewsSummaryInputError, is_valid_summary, summarize_news_content
 
 
 def summarize_news_by_id(news_id, fallback_title="", fallback_content=""):
@@ -14,7 +14,7 @@ def summarize_news_by_id(news_id, fallback_title="", fallback_content=""):
     if article is None:
         return None
 
-    cached_summary = normalize_summary(article.summary)
+    cached_summary = normalize_cached_summary(article.summary)
     if cached_summary:
         return {
             "news": article,
@@ -27,7 +27,7 @@ def summarize_news_by_id(news_id, fallback_title="", fallback_content=""):
         if article is None:
             return None
 
-        cached_summary = normalize_summary(article.summary)
+        cached_summary = normalize_cached_summary(article.summary)
         if cached_summary:
             return {
                 "news": article,
@@ -88,6 +88,11 @@ def get_summary_update_fields(article):
 
 def normalize_summary(summary):
     return str(summary or "").strip()
+
+
+def normalize_cached_summary(summary):
+    summary = normalize_summary(summary)
+    return summary if is_valid_summary(summary) else ""
 
 
 def normalize_content(content):

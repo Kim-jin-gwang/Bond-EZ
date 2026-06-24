@@ -21,6 +21,14 @@ ARTICLE_SELECTORS = (
     ".articleCont",
     "article",
 )
+NOISE_SELECTORS = (
+    ".media_end_summary",
+    "table.nbd_table",
+    ".end_photo_org",
+    ".img_desc",
+    ".reporter_area",
+    ".copyright",
+)
 
 
 def fetch_article_content(url):
@@ -73,6 +81,15 @@ def remove_noise(soup):
     for tag in soup(["script", "style", "noscript", "iframe", "aside", "nav", "footer"]):
         tag.decompose()
 
+    for selector in NOISE_SELECTORS:
+        for element in soup.select(selector):
+            element.decompose()
+
 
 def normalize_content(content):
-    return " ".join(str(content or "").split())
+    content = " ".join(str(content or "").split())
+    if "<기자>" in content:
+        content = content.split("<기자>", 1)[1]
+    content = content.replace("<앵커>", " ").replace("<기자>", " ")
+    content = " ".join(content.split())
+    return content
