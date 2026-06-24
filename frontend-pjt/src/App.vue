@@ -1,5 +1,5 @@
 <script setup>
-import { computed, watch } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import GlobalNav from './components/gnb/GlobalNav.vue'
 import FloatingBondChat from './components/chat/FloatingBondChat.vue'
@@ -19,6 +19,10 @@ watch(selectedIndicatorId, (indicatorId) => {
     appStore.setIndicator(indicatorId)
   }
 }, { immediate: true })
+
+onMounted(() => {
+  appStore.checkAuth()
+})
 </script>
 
 <template>
