@@ -93,6 +93,16 @@ DATABASES = {
     }
 }
 
+DB_SSLMODE = os.environ.get('DB_SSLMODE', '')
+if DB_SSLMODE:
+    DATABASES['default']['OPTIONS'] = {'sslmode': DB_SSLMODE}
+    DATABASES['default']['DISABLE_SERVER_SIDE_CURSORS'] = True
+    DATABASES['default']['CONN_HEALTH_CHECKS'] = True
+
+DB_CHANNEL_BINDING = os.environ.get('DB_CHANNEL_BINDING', '')
+if DB_CHANNEL_BINDING:
+    DATABASES['default'].setdefault('OPTIONS', {})['channel_binding'] = DB_CHANNEL_BINDING
+
 # DATABASES = {
 #     'default': {
 #         'ENGINE': 'django.db.backends.postgresql',
@@ -159,3 +169,11 @@ ELASTICSEARCH_HOSTS = [
 ELASTICSEARCH_BONDS_INDEX = os.environ.get('ELASTICSEARCH_BONDS_INDEX', 'bonds_search')
 ELASTICSEARCH_GLOSSARY_INDEX = os.environ.get('ELASTICSEARCH_GLOSSARY_INDEX', 'glossary_search')
 ELASTICSEARCH_REQUEST_TIMEOUT = float(os.environ.get('ELASTICSEARCH_REQUEST_TIMEOUT', '2'))
+
+NEWS_SUMMARY_LM_MODEL = os.environ.get('NEWS_SUMMARY_LM_MODEL', 'gemini/gemini-2.5-flash')
+NEWS_SUMMARY_LM_API_KEY = os.environ.get('NEWS_SUMMARY_LM_API_KEY', '')
+NEWS_SUMMARY_LM_TEMPERATURE = float(os.environ.get('NEWS_SUMMARY_LM_TEMPERATURE', '0.2'))
+NEWS_SUMMARY_LM_MAX_TOKENS = int(os.environ.get('NEWS_SUMMARY_LM_MAX_TOKENS', '512'))
+NEWS_SUMMARY_DSPY_PROGRAM_PATH = os.environ.get('NEWS_SUMMARY_DSPY_PROGRAM_PATH', '')
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')

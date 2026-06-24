@@ -8,3 +8,6 @@ langchain-core==0.3.75
 langchain-google-genai==2.1.10
 langchain-openai==0.3.32
 elasticsearch==8.17.0
+dspy
+requests==2.32.5
+beautifulsoup4==4.13.3

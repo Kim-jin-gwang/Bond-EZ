@@ -15,7 +15,7 @@ def serialize_news_list_item(news):
             },
             "title": news.title,
             "url": news.url,
-            "summary": "",
+            "summary": getattr(news, "summary", "") or "",
             "published_at": news.write_date.isoformat() if news.write_date else None,
         }
 
@@ -31,6 +31,6 @@ def serialize_news_list_item(news):
 
 def serialize_news_detail(news):
     data = serialize_news_list_item(news)
-    data["content"] = getattr(news, "content", "") or data.get("summary", "")
+    data["content"] = getattr(news, "content", "") or ""
     return data
 

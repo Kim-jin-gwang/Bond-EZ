@@ -51,6 +51,7 @@ class NewsArticle(models.Model):
     title = models.CharField(max_length=255)
     source = models.CharField(max_length=255, blank=True, null=True)
     url = models.URLField(max_length=500, blank=True, null=True)
+    summary = models.TextField(blank=True)
     write_date = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(null=True, blank=True)
 
