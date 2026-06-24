@@ -196,7 +196,7 @@ onMounted(async () => {
 .dictionary-empty {
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: white;
+  background: var(--surface);
   box-shadow: var(--shadow);
 }
 
@@ -234,7 +234,7 @@ onMounted(async () => {
   border-radius: 8px;
   padding: 0 13px;
   color: var(--text);
-  background: white;
+  background: var(--surface);
   font-size: 14px;
   font-weight: 800;
 }
@@ -347,13 +347,13 @@ onMounted(async () => {
   border-radius: 8px;
   padding: 8px 14px;
   color: var(--primary);
-  background: white;
+  background: var(--surface);
   font-weight: 800;
 }
 
 .error-state {
   border-color: #f2c7c7;
-  background: #fff7f7;
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface));
 }
 
 .pagination {
@@ -371,7 +371,7 @@ onMounted(async () => {
   border-radius: 8px;
   padding: 0 14px;
   color: var(--primary);
-  background: white;
+  background: var(--surface);
   font-weight: 800;
 }
 

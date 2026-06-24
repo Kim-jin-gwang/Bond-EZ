@@ -183,7 +183,7 @@ const currentValue = computed(() => {
 .spread-summary {
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: white;
+  background: var(--surface);
   box-shadow: var(--shadow);
 }
 
@@ -258,7 +258,7 @@ const currentValue = computed(() => {
   border-radius: 8px;
   padding: 9px 12px;
   color: var(--primary-dark);
-  background: #f8fbfd;
+  background: var(--surface-soft);
   font-size: 12px;
   font-weight: 900;
 }
@@ -326,7 +326,7 @@ const currentValue = computed(() => {
   border: 1px solid var(--line);
   border-left: 5px solid var(--primary);
   border-radius: 8px;
-  background: white;
+  background: var(--surface);
   box-shadow: var(--shadow);
 }
 

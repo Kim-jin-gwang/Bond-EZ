@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue'
+import { useTheme } from '../../composables/useTheme'
 import { useAppStore } from '../../stores/app'
 
 
@@ -13,6 +14,7 @@ defineProps({
 defineEmits(['navigate'])
 
 const appStore = useAppStore()
+const { isDark, toggleTheme } = useTheme()
 
 const navItems = computed(() => [
   { id: 'market', label: '채권 시세' },
@@ -32,17 +34,28 @@ const navItems = computed(() => [
       <span>BondEZ</span>
     </button>
 
-    <nav class="nav-links" aria-label="Global Navigation Bar">
+    <div class="nav-actions">
+      <nav class="nav-links" aria-label="Global Navigation Bar">
+        <button
+          v-for="item in navItems"
+          :key="item.id"
+          class="nav-link"
+          :class="{ active: activePage === item.id }"
+          type="button"
+          @click="$emit('navigate', item.id)"
+        >
+          {{ item.label }}
+        </button>
+      </nav>
       <button
-        v-for="item in navItems"
-        :key="item.id"
-        class="nav-link"
-        :class="{ active: activePage === item.id }"
+        class="theme-toggle"
         type="button"
-        @click="$emit('navigate', item.id)"
+        :aria-label="isDark ? '라이트 모드로 전환' : '다크 모드로 전환'"
+        :title="isDark ? '라이트 모드' : '다크 모드'"
+        @click="toggleTheme"
       >
-        {{ item.label }}
+        <span aria-hidden="true">{{ isDark ? '☀' : '☾' }}</span>
       </button>
-    </nav>
+    </div>
   </header>
 </template>

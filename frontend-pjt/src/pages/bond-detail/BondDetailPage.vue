@@ -797,7 +797,7 @@ function tooltipDescription(value) {
 .cashflow-grid {
   width: 100%;
   border-collapse: collapse;
-  background: white;
+  background: var(--surface);
 }
 
 :deep(.info-table) {
@@ -831,7 +831,7 @@ function tooltipDescription(value) {
 .trade-panel th,
 .cashflow-grid th {
   color: var(--text);
-  background: #f5f8fb;
+  background: var(--surface-soft);
   font-weight: 900;
 }
 
@@ -869,7 +869,7 @@ function tooltipDescription(value) {
   border-radius: 8px;
   padding: 0 12px;
   color: var(--text);
-  background: white;
+  background: var(--surface);
   font-size: 13px;
   font-weight: 900;
 }
@@ -894,7 +894,7 @@ function tooltipDescription(value) {
 .cashflow-detail-panel {
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fbfdff;
+  background: var(--surface-raised);
 }
 
 .condition-panel,
@@ -946,7 +946,7 @@ function tooltipDescription(value) {
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: white;
+  background: var(--surface);
 }
 
 .condition-matrix dt,
@@ -1000,12 +1000,12 @@ function tooltipDescription(value) {
   padding: 13px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: white;
+  background: var(--surface);
 }
 
 .profit-metric-grid article.highlight {
   border-color: rgba(31, 111, 120, 0.38);
-  background: #f4fafb;
+  background: var(--surface-soft);
 }
 
 .profit-metric-grid span {

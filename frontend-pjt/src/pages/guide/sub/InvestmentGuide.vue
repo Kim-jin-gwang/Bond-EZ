@@ -195,7 +195,7 @@ h1 {
 
 .checklist-item:hover {
   border-color: var(--primary);
-  background: #fafdff;
+  background: var(--surface-raised);
 }
 
 .checklist-item.checked {

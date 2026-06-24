@@ -662,13 +662,13 @@ async function handleWithdraw() {
 }
 
 .alert-box.error {
-  background-color: #fef2f2;
+  background-color: color-mix(in srgb, var(--danger) 12%, var(--surface));
   color: #ef4444;
   border: 1px solid #fee2e2;
 }
 
 .alert-box.success {
-  background-color: #f0fdf4;
+  background-color: color-mix(in srgb, var(--good) 12%, var(--surface));
   color: #22c55e;
   border: 1px solid #dcfce7;
 }
@@ -709,7 +709,7 @@ async function handleWithdraw() {
 }
 
 .btn-goto-market {
-  background: white;
+  background: var(--surface);
   border: 1px solid var(--primary, #3b82f6);
   color: var(--primary, #3b82f6);
   padding: 8px 16px;
@@ -737,7 +737,7 @@ async function handleWithdraw() {
   align-items: center;
   justify-content: space-between;
   padding: 16px;
-  background: white;
+  background: var(--surface);
   border: 1px solid var(--line, #e2e8f0);
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
@@ -826,7 +826,7 @@ async function handleWithdraw() {
 }
 
 .btn-withdraw {
-  background: #fef2f2 !important;
+  background: color-mix(in srgb, var(--danger) 12%, var(--surface)) !important;
   color: #ef4444 !important;
   border: 1px solid #fee2e2 !important;
 }
@@ -851,7 +851,7 @@ async function handleWithdraw() {
 }
 
 .modal-box {
-  background: white;
+  background: var(--surface);
   padding: 28px;
   border-radius: 16px;
   width: 100%;
@@ -921,7 +921,7 @@ async function handleWithdraw() {
 }
 
 .profile-page :deep(.summary-card) {
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  background: var(--surface);
   padding: 24px 20px;
   border-radius: 12px;
   border: 1px solid var(--line, #e2e8f0);
@@ -972,7 +972,7 @@ async function handleWithdraw() {
 }
 
 .btn-view-more-header {
-  background: white;
+  background: var(--surface);
   border: 1px solid var(--line, #e2e8f0);
   color: var(--muted, #64748b);
   padding: 6px 14px;
@@ -987,7 +987,7 @@ async function handleWithdraw() {
 .btn-view-more-header:hover {
   border-color: var(--primary, #3b82f6);
   color: var(--primary, #3b82f6);
-  background: #f8fafc;
+  background: var(--surface-soft);
 }
 
 /* Recent list bookmark button */

@@ -50,7 +50,7 @@ defineProps({
 
 .indicator-data-table th {
   color: var(--text);
-  background: #f5f8fb;
+  background: var(--surface-soft);
   font-size: 13px;
   font-weight: 900;
 }

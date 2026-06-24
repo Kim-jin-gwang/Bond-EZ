@@ -141,7 +141,7 @@ const currentValue = computed(() => {
 .explanation {
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: white;
+  background: var(--surface);
   box-shadow: var(--shadow);
 }
 
@@ -282,7 +282,7 @@ const currentValue = computed(() => {
 
 .state-pill.negative {
   color: #a15c12;
-  background: #fff1dc;
+  background: color-mix(in srgb, var(--accent) 15%, var(--surface));
 }
 
 .spread-chart-grid {
@@ -298,7 +298,7 @@ const currentValue = computed(() => {
   border: 1px solid var(--line);
   border-left: 5px solid var(--primary);
   border-radius: 8px;
-  background: white;
+  background: var(--surface);
   box-shadow: var(--shadow);
 }
 

@@ -144,7 +144,7 @@ const barRows = computed(() => {
 .indicator-panel {
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: white;
+  background: var(--surface);
 }
 
 .indicator-explanation,
@@ -185,7 +185,7 @@ const barRows = computed(() => {
   min-height: 260px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fbfdff;
+  background: var(--surface-raised);
 }
 
 .line-chart line {

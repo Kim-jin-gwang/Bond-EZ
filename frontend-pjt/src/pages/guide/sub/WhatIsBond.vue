@@ -187,7 +187,7 @@ h1 {
   width: 20%;
   font-weight: 600;
   color: var(--text) !important;
-  background: #fbfcfd;
+  background: var(--surface-raised);
 }
 
 /* 두 번째 열: 은행 예금 */

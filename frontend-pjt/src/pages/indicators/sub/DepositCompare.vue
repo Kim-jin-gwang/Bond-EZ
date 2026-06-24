@@ -141,7 +141,7 @@ const bestRow = computed(() =>
 .reading-note {
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: white;
+  background: var(--surface);
   box-shadow: var(--shadow);
 }
 
@@ -231,7 +231,7 @@ const bestRow = computed(() =>
   border-radius: 999px;
   padding: 8px 12px;
   color: var(--text);
-  background: #f8fbfd;
+  background: var(--surface-soft);
   font-size: 12px;
   font-weight: 900;
 }

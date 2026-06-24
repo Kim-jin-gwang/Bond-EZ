@@ -408,7 +408,7 @@ onMounted(async () => {
 .compare-section {
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: white;
+  background: var(--surface);
   box-shadow: var(--shadow);
 }
 
@@ -526,7 +526,7 @@ onMounted(async () => {
 
 .perspective-tabs button.active {
   color: var(--primary-dark);
-  background: white;
+  background: var(--surface);
   box-shadow: 0 1px 4px rgba(23, 43, 59, 0.12);
 }
 
@@ -557,7 +557,7 @@ onMounted(async () => {
   grid-template-areas: "left result right";
   grid-template-columns: minmax(0, 1fr) minmax(220px, 0.85fr) minmax(0, 1fr);
   min-height: 116px;
-  background: white;
+  background: var(--surface);
 }
 
 .metric-row + .metric-row {
@@ -611,19 +611,19 @@ onMounted(async () => {
 .metric-value > span {
   border-radius: 4px;
   padding: 2px 6px;
-  color: #176340;
+  color: var(--good);
   background: #dff3e8;
   font-size: 11px;
   font-weight: 900;
 }
 
 .metric-value.matched {
-  background: #f0faf5;
+  background: color-mix(in srgb, var(--good) 12%, var(--surface));
   box-shadow: inset 0 0 0 2px #6bb78e;
 }
 
 .metric-value.matched strong {
-  color: #176340;
+  color: var(--good);
 }
 
 .metric-result {
@@ -644,7 +644,7 @@ onMounted(async () => {
 }
 
 .metric-result > strong {
-  color: #176340;
+  color: var(--good);
   font-size: 14px;
   line-height: 1.4;
   word-break: keep-all;

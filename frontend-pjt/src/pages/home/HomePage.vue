@@ -591,7 +591,7 @@ onMounted(async () => {
   border: 1px solid var(--line);
   border-radius: 8px;
   color: var(--primary-dark);
-  background: white;
+  background: var(--surface);
   box-shadow: 0 8px 20px rgba(23, 43, 59, 0.06);
   font-size: 24px;
   font-weight: 800;
@@ -614,7 +614,7 @@ onMounted(async () => {
   min-width: 0;
   margin-top: 6px;
   border-collapse: collapse;
-  background: white;
+  background: var(--surface);
 }
 
 .mini-rate-table th,
@@ -627,7 +627,7 @@ onMounted(async () => {
 .mini-rate-table th {
   width: 52%;
   color: var(--text);
-  background: #f8fafc;
+  background: var(--surface-soft);
   font-weight: 800;
 }
 
@@ -651,8 +651,8 @@ onMounted(async () => {
   border: 1px solid rgba(31, 111, 120, 0.18);
   border-radius: 8px;
   background:
-    radial-gradient(circle at 12% 18%, rgba(31, 111, 120, 0.16), transparent 26%),
-    linear-gradient(135deg, #ffffff 0%, #f4f8fb 46%, #eef4f8 100%);
+    radial-gradient(circle at 12% 18%, color-mix(in srgb, var(--primary) 18%, transparent), transparent 26%),
+    linear-gradient(135deg, var(--surface) 0%, var(--surface-raised) 46%, var(--surface-soft) 100%);
   box-shadow: 0 24px 70px rgba(23, 43, 59, 0.1);
 }
 
@@ -668,7 +668,7 @@ onMounted(async () => {
 
 .hero-copy h1 {
   margin-bottom: 18px;
-  color: #162330;
+  color: var(--text);
   font-size: clamp(32px, 4.2vw, 52px);
   line-height: 1.12;
   overflow-wrap: break-word;
@@ -711,7 +711,7 @@ onMounted(async () => {
 .text-action {
   border: 1px solid var(--line);
   color: var(--text);
-  background: white;
+  background: var(--surface);
 }
 
 .search-panel-heading {
@@ -769,7 +769,7 @@ onMounted(async () => {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 0 14px;
-  background: white;
+  background: var(--surface);
   font-size: 13px;
   font-weight: 800;
 }
@@ -783,7 +783,7 @@ onMounted(async () => {
   padding: 20px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: white;
+  background: var(--surface);
   box-shadow: var(--shadow);
   transition:
     transform 0.2s ease,
@@ -890,7 +890,7 @@ onMounted(async () => {
   padding: 26px;
   border: 1px solid rgba(217, 140, 49, 0.28);
   border-radius: 8px;
-  background: #fff9f0;
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
 }
 
 .guide-strip h2 {
@@ -971,7 +971,7 @@ onMounted(async () => {
 .curated-bond-item {
   border: 1px solid var(--line, #e2e8f0);
   border-radius: 8px;
-  background: #fbfdff;
+  background: var(--surface-raised);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
@@ -1073,7 +1073,7 @@ onMounted(async () => {
   border-radius: 8px;
   padding: 0 14px;
   color: var(--text);
-  background: white;
+  background: var(--surface);
   font-weight: 800;
   font-size: 12px;
   cursor: pointer;

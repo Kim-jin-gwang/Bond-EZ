@@ -615,7 +615,7 @@ onMounted(() => {
   padding: 24px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: white;
+  background: var(--surface);
 }
 
 .sr-only {
@@ -648,7 +648,7 @@ onMounted(() => {
 
 .error-state {
   border-color: #f2c7c7;
-  background: #fff7f7;
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface));
 }
 
 .error-state button,
@@ -659,7 +659,7 @@ onMounted(() => {
   border-radius: 8px;
   padding: 0 14px;
   color: var(--primary);
-  background: white;
+  background: var(--surface);
   font-weight: 800;
 }
 
@@ -719,7 +719,7 @@ onMounted(() => {
   padding: 10px 12px;
   border: 1px solid #b9d9d5;
   border-radius: 8px;
-  background: #f3faf9;
+  background: color-mix(in srgb, var(--primary) 9%, var(--surface));
   color: var(--primary-dark);
   font-size: 13px;
 }
@@ -745,7 +745,7 @@ onMounted(() => {
   padding: 5px 6px 5px 9px;
   border: 1px solid #b9d9d5;
   border-radius: 6px;
-  background: white;
+  background: var(--surface);
 }
 
 .selected-bond-item > span {
@@ -771,7 +771,7 @@ onMounted(() => {
 
 .selected-bond-item button:hover {
   color: var(--accent);
-  background: #fff4f1;
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface));
 }
 
 .compare-fab:disabled {
@@ -780,7 +780,7 @@ onMounted(() => {
 }
 
 tr.selected {
-  background: #f3faf9;
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface));
 }
 
 .bond-name-cell {
@@ -824,12 +824,12 @@ tr.selected {
 
 .market-badge.internal {
   color: var(--primary);
-  background: #eef4f8;
+  background: var(--surface-soft);
 }
 
 .market-badge.external {
   color: var(--accent);
-  background: #fff7ec;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
 }
 
 .filter-actions {
@@ -966,8 +966,8 @@ tr.selected {
 }
 
 .curated-banner {
-  background: linear-gradient(90deg, #eff6ff 0%, #dbeafe 100%);
-  border: 1px solid #bfdbfe;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--info) 8%, var(--surface)), color-mix(in srgb, var(--info) 15%, var(--surface)));
+  border: 1px solid color-mix(in srgb, var(--info) 38%, var(--line));
   border-radius: 8px;
   padding: 12px 18px;
   margin-bottom: 20px;
@@ -981,7 +981,7 @@ tr.selected {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #1e40af;
+  color: var(--info);
   font-size: 14px;
 }
 
@@ -990,9 +990,9 @@ tr.selected {
 }
 
 .btn-clear-curated {
-  background: white;
-  border: 1px solid #3b82f6;
-  color: #3b82f6;
+  background: var(--surface);
+  border: 1px solid var(--info);
+  color: var(--info);
   padding: 6px 14px;
   border-radius: 6px;
   font-weight: 800;
@@ -1002,7 +1002,7 @@ tr.selected {
 }
 
 .btn-clear-curated:hover {
-  background: #3b82f6;
+  background: var(--info);
   color: white;
 }
 

@@ -225,7 +225,7 @@ onMounted(async () => {
 .news-list-panel {
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: white;
+  background: var(--surface);
   box-shadow: var(--shadow);
 }
 
@@ -279,7 +279,7 @@ onMounted(async () => {
 .rate-news-item {
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fbfdff;
+  background: var(--surface-raised);
 }
 
 .rate-news-item + .rate-news-item {
@@ -329,7 +329,7 @@ onMounted(async () => {
   border-radius: 8px;
   padding: 0 14px;
   color: var(--primary);
-  background: white;
+  background: var(--surface);
   font-weight: 900;
   text-decoration: none;
   white-space: nowrap;
@@ -350,7 +350,7 @@ onMounted(async () => {
   padding: 16px;
   border: 1px solid #d7e7e9;
   border-radius: 8px;
-  background: #f4fafb;
+  background: var(--surface-soft);
 }
 
 .news-summary strong {
@@ -390,7 +390,7 @@ onMounted(async () => {
 
 .error-state {
   border-color: #f2c7c7;
-  background: #fff7f7;
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface));
 }
 
 .pagination {
@@ -408,7 +408,7 @@ onMounted(async () => {
   border-radius: 8px;
   padding: 0 14px;
   color: var(--primary);
-  background: white;
+  background: var(--surface);
   font-weight: 800;
 }
 
