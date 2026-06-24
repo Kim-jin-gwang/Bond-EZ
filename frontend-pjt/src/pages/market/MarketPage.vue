@@ -19,7 +19,7 @@ const isCuratedMode = ref(false)
 const filtersOpen = ref(false)
 const searchInput = ref(props.marketSearch?.keyword || '')
 const searchKeyword = useDebouncedRef(searchInput)
-const selectedBondCodes = ref([])
+const selectedBonds = ref([])
 const selectedFilters = ref({
   bondTypes: props.marketSearch?.filters?.bondTypes || [],
   maturities: props.marketSearch?.filters?.maturities || [],
@@ -114,13 +114,8 @@ const filterGroups = ref([
   },
 ])
 
-const selectedBonds = computed(() =>
-  selectedBondCodes.value
-    .map((code) => bonds.value.find((bond) => bond.code === code))
-    .filter(Boolean),
-)
-
-const canCompare = computed(() => selectedBondCodes.value.length === 2)
+const selectedBondIds = computed(() => selectedBonds.value.map((bond) => bondSelectionKey(bond)))
+const canCompare = computed(() => selectedBonds.value.length === 2)
 
 watch(() => props.marketSearch, (newVal) => {
   if (newVal) {
@@ -151,7 +146,6 @@ watch([searchKeyword, selectedFilters], () => {
 }, { deep: true })
 
 watch(currentPage, () => {
-  selectedBondCodes.value = []
   loadBonds()
 })
 
@@ -169,23 +163,33 @@ function clearGroupFilter(key) {
   }
 }
 
-function isBondSelected(code) {
-  return selectedBondCodes.value.includes(code)
+function bondSelectionKey(bond) {
+  return String(bond?.bondId || bond?.code || '')
 }
 
-function isSelectionDisabled(code) {
-  return !isBondSelected(code) && selectedBondCodes.value.length >= 2
+function isBondSelected(bond) {
+  return selectedBondIds.value.includes(bondSelectionKey(bond))
 }
 
-function toggleBondSelection(code) {
-  if (isBondSelected(code)) {
-    selectedBondCodes.value = selectedBondCodes.value.filter((selectedCode) => selectedCode !== code)
+function isSelectionDisabled(bond) {
+  return !isBondSelected(bond) && selectedBonds.value.length >= 2
+}
+
+function toggleBondSelection(bond) {
+  const key = bondSelectionKey(bond)
+  if (isBondSelected(bond)) {
+    selectedBonds.value = selectedBonds.value.filter((selectedBond) => bondSelectionKey(selectedBond) !== key)
     return
   }
 
-  if (selectedBondCodes.value.length < 2) {
-    selectedBondCodes.value = [...selectedBondCodes.value, code]
+  if (selectedBonds.value.length < 2) {
+    selectedBonds.value = [...selectedBonds.value, bond]
   }
+}
+
+function removeBondSelection(bond) {
+  const key = bondSelectionKey(bond)
+  selectedBonds.value = selectedBonds.value.filter((selectedBond) => bondSelectionKey(selectedBond) !== key)
 }
 
 function compareSelectedBonds() {
@@ -465,7 +469,7 @@ onMounted(() => {
       <div class="market-info">
         <p class="eyebrow">{{ isCuratedMode ? '맞춤 큐레이션 추천 채권' : '전체 채권 시세' }}</p>
         <h1 aria-live="polite">{{ isCuratedMode ? '나에게 맞춰 큐레이션된 추천 채권이 ' + bonds.length + '개 있습니다' : pageInfo.totalElements + '개의 채권이 검색되었습니다' }}</h1>
-        <p class="selection-help">비교할 채권을 최대 2개까지 선택하세요. 현재 {{ selectedBondCodes.length }}/2개 선택</p>
+        <p class="selection-help">비교할 채권을 최대 2개까지 선택하세요. 현재 {{ selectedBonds.length }}/2개 선택</p>
       </div>
       <button
         class="compare-fab"
@@ -476,6 +480,24 @@ onMounted(() => {
       >
         비교하기
       </button>
+    </div>
+
+    <div v-if="selectedBonds.length" class="comparison-selection" aria-label="선택한 비교 대상">
+      <strong>비교 대상</strong>
+      <div class="selected-bond-list">
+        <div v-for="bond in selectedBonds" :key="bondSelectionKey(bond)" class="selected-bond-item">
+          <span>{{ bond.shortName || bond.name }}</span>
+          <button
+            type="button"
+            :aria-label="`${bond.shortName || bond.name} 비교 선택 해제`"
+            title="비교 선택 해제"
+            @click="removeBondSelection(bond)"
+          >
+            ×
+          </button>
+        </div>
+      </div>
+      <span>{{ selectedBonds.length }}/2</span>
     </div>
 
     <section v-if="isLoading" class="market-state" aria-live="polite">
@@ -508,14 +530,14 @@ onMounted(() => {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="bond in visibleBonds" :key="bond.code" :class="{ selected: isBondSelected(bond.code) }">
+          <tr v-for="bond in visibleBonds" :key="bond.code" :class="{ selected: isBondSelected(bond) }">
             <td>
               <input
                 type="checkbox"
                 :aria-label="`${bond.shortName} 비교 선택`"
-                :checked="isBondSelected(bond.code)"
-                :disabled="isSelectionDisabled(bond.code)"
-                @change="toggleBondSelection(bond.code)"
+                :checked="isBondSelected(bond)"
+                :disabled="isSelectionDisabled(bond)"
+                @change="toggleBondSelection(bond)"
               />
             </td>
             <td class="bond-title-cell">
@@ -686,6 +708,70 @@ onMounted(() => {
 .selection-help {
   margin-bottom: 0;
   font-size: 14px;
+}
+
+.comparison-selection {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  margin: -4px 0 16px;
+  padding: 10px 12px;
+  border: 1px solid #b9d9d5;
+  border-radius: 8px;
+  background: #f3faf9;
+  color: var(--primary-dark);
+  font-size: 13px;
+}
+
+.comparison-selection > strong,
+.comparison-selection > span {
+  white-space: nowrap;
+}
+
+.selected-bond-list {
+  display: flex;
+  min-width: 0;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.selected-bond-item {
+  display: flex;
+  min-width: 0;
+  max-width: 280px;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px 5px 9px;
+  border: 1px solid #b9d9d5;
+  border-radius: 6px;
+  background: white;
+}
+
+.selected-bond-item > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selected-bond-item button {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  place-items: center;
+  border: 0;
+  border-radius: 4px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.selected-bond-item button:hover {
+  color: var(--accent);
+  background: #fff4f1;
 }
 
 .compare-fab:disabled {
@@ -945,5 +1031,30 @@ tr.selected {
 
 .btn-favorite.active {
   color: #fbbf24;
+}
+
+@media (max-width: 720px) {
+  .market-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .compare-fab {
+    width: 100%;
+  }
+
+  .comparison-selection {
+    grid-template-columns: 1fr auto;
+  }
+
+  .selected-bond-list {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .selected-bond-item {
+    max-width: 100%;
+  }
 }
 </style>
