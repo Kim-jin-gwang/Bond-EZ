@@ -6,7 +6,6 @@ cd "$(dirname "$0")"
 
 # docker compose 명령어 설정
 COMPOSE="docker compose -f docker-compose.yml"
-DB_SERVICE="db"
 BACKEND_SERVICE="backend"
 
 # 진행 상황을 보기 좋게 출력합니다.
@@ -28,18 +27,18 @@ command_exists() {
 env_value_or_default() {
   key="$1"
   default="$2"
-  value="$(grep -E "^${key}=" .env 2>/dev/null | tail -n 1 | cut -d '=' -f 2- || true)"
-  value="$(printf '%s' "$value" | tr -d '"' | tr -d "'")"
-
-  if [ -n "$value" ]; then
-    printf '%s' "$value"
-  else
-    printf '%s' "$default"
+  if [ -f ".env" ]; then
+    value="$(grep -E "^${key}=" .env 2>/dev/null | tail -n 1 | cut -d '=' -f 2- || true)"
+    value="$(printf '%s' "$value" | tr -d '"' | tr -d "'")"
+    if [ -n "$value" ]; then
+      printf '%s' "$value"
+      return
+    fi
   fi
+  printf '%s' "$default"
 }
 
 # DB처럼 healthcheck가 있는 서비스가 준비될 때까지 기다립니다.
-# Postgres는 최초 실행 시 init.sql, DB 생성 등을 마친 뒤에야 안전하게 접속할 수 있습니다.
 wait_for_healthy() {
   service="$1"
   timeout="${2:-90}"
@@ -108,31 +107,60 @@ docker network inspect web_net >/dev/null 2>&1 || {
   docker network create web_net
 }
 
-# 1. 전체 프로젝트 빌드
-info "Building application Docker images..."
-$COMPOSE build
+# 기본 사용법 안내
+usage() {
+  echo "Usage: sh $0 {up|down|logs}"
+  exit 1
+}
 
-# 2. 인프라 서비스 먼저 실행 (Elasticsearch, Kibana)
-info "Starting infrastructure services (Elasticsearch, Kibana)..."
-$COMPOSE up -d elasticsearch kibana
+if [ $# -lt 1 ]; then
+  usage
+fi
 
-# 3. 애플리케이션 및 동기화 서비스 실행 (Backend, Frontend, Logstash)
-info "Starting Django backend, Vue frontend, and Logstash..."
-$COMPOSE up -d
+ACTION="$1"
 
-# 5. Django 마이그레이션 적용
-info "Applying Django migrations..."
-$COMPOSE exec "$BACKEND_SERVICE" python manage.py migrate
+case "$ACTION" in
+  up)
+    # 1. 전체 프로젝트 빌드
+    info "Building application Docker images..."
+    $COMPOSE build
 
-# 접속 정보 출력
-FRONTEND_PORT="$(env_value_or_default FRONTEND_PORT 5173)"
-BACKEND_PORT="$(env_value_or_default BACKEND_PORT 8000)"
+    # 2. 인프라 서비스 먼저 실행 (Elasticsearch, Kibana)
+    info "Starting infrastructure services (Elasticsearch, Kibana)..."
+    $COMPOSE up -d elasticsearch kibana
 
-info "Application Services Deployment Complete!"
-printf '%s\n' '--------------------------------------------------'
-printf '🚀 Services are running at:\n'
-printf '  - Frontend      : http://localhost:%s\n' "$FRONTEND_PORT"
-printf '  - Backend API   : http://localhost:%s\n' "$BACKEND_PORT"
-printf '  - Kibana UI     : http://localhost:5601\n'
-printf '%s\n' '--------------------------------------------------'
-printf 'Use "docker compose -f docker-compose.yml logs -f" to watch logs.\n'
+    # 3. 애플리케이션 및 동기화 서비스 실행 (Backend, Frontend, Logstash)
+    info "Starting Django backend, Vue frontend, and Logstash..."
+    $COMPOSE up -d
+
+    # 4. Backend가 준비될 때까지 대기 후 마이그레이션 적용
+    info "Waiting for backend service to be ready..."
+    wait_for_healthy "$BACKEND_SERVICE"
+
+    info "Applying Django migrations..."
+    $COMPOSE exec "$BACKEND_SERVICE" python manage.py migrate
+
+    # 접속 정보 출력
+    FRONTEND_PORT="$(env_value_or_default FRONTEND_PORT 5173)"
+    BACKEND_PORT="$(env_value_or_default BACKEND_PORT 8000)"
+
+    info "Application Services Deployment Complete!"
+    printf '%s\n' '--------------------------------------------------'
+    printf '🚀 Services are running at:\n'
+    printf '  - Frontend      : http://localhost:%s\n' "$FRONTEND_PORT"
+    printf '  - Backend API   : http://localhost:%s\n' "$BACKEND_PORT"
+    printf '  - Kibana UI     : http://localhost:5601\n'
+    printf '%s\n' '--------------------------------------------------'
+    ;;
+  down)
+    info "Stopping application services..."
+    $COMPOSE down
+    ;;
+  logs)
+    info "Viewing logs for application services..."
+    $COMPOSE logs -f
+    ;;
+  *)
+    usage
+    ;;
+esac

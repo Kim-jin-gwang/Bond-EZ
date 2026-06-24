@@ -116,59 +116,85 @@ docker network inspect web_net >/dev/null 2>&1 || {
   docker network create web_net
 }
 
-# 1. 데이터 파이프라인 DB 및 인프라 상태 확인 대기
-DB_HOST="$(get_env_value "DB_HOST" "db")"
+# 기본 사용법 안내
+usage() {
+  echo "Usage: sh $0 {up|down|logs}"
+  exit 1
+}
 
-# Elasticsearch 상태 확인 및 자동 구동
-es_container_id="$($COMPOSE_APP ps -q elasticsearch 2>/dev/null || true)"
-if [ -z "$es_container_id" ]; then
-  info "Elasticsearch container is not running. Starting elasticsearch automatically..."
-  if ! $COMPOSE_APP up -d elasticsearch; then
-    error "Failed to start Elasticsearch service."
-    exit 1
-  fi
+if [ $# -lt 1 ]; then
+  usage
 fi
 
-if [ "$DB_HOST" = "db" ]; then
-  info "Checking if database is ready..."
-  wait_for_healthy_app_service "$DB_SERVICE"
-else
-  info "Using external database at '$DB_HOST'. Skipping local database container check."
-fi
+ACTION="$1"
 
-# 2. 데이터 파이프라인 이미지 빌드
-info "Building data pipeline Docker images..."
-$COMPOSE_DATA build
+case "$ACTION" in
+  up)
+    # 1. 데이터 파이프라인 DB 및 인프라 상태 확인 대기
+    DB_HOST="$(get_env_value "DB_HOST" "db")"
 
-# 3. 파이프라인 기초 인프라 실행 (Zookeeper, Kafka, Hadoop HDFS)
-info "Starting pipeline infrastructure services (Zookeeper, Kafka, Hadoop HDFS)..."
-$COMPOSE_DATA up -d zookeeper kafka namenode datanode
+    # Elasticsearch 상태 확인 및 자동 구동
+    es_container_id="$($COMPOSE_APP ps -q elasticsearch 2>/dev/null || true)"
+    if [ -z "$es_container_id" ]; then
+      info "Elasticsearch container is not running. Starting elasticsearch automatically..."
+      if ! $COMPOSE_APP up -d elasticsearch; then
+        error "Failed to start Elasticsearch service."
+        exit 1
+      fi
+    fi
 
-# 4. 나머지 파이프라인 서비스 실행 (Airflow, Spark, Flink, News Crawler)
-info "Starting all remaining data pipeline services..."
-$COMPOSE_DATA up -d
+    if [ "$DB_HOST" = "db" ]; then
+      info "Checking if database is ready..."
+      wait_for_healthy_app_service "$DB_SERVICE"
+    else
+      info "Using external database at '$DB_HOST'. Skipping local database container check."
+    fi
 
-# 5. Glossary 데이터 적재 실행 (news-crawler가 실행 중이어야 함)
-info "Loading Glossary data from CSV into PostgreSQL..."
-$COMPOSE_DATA exec news-crawler python glossary/glossary_pipeline.py --load
+    # 2. 데이터 파이프라인 이미지 빌드
+    info "Building data pipeline Docker images..."
+    $COMPOSE_DATA build
 
-# 6. HDFS 디렉토리 초기 설정 (/raw/bonds, /raw/news)
-info "Initializing HDFS directories (/raw/bonds, /raw/news)..."
-for i in $(seq 1 15); do
-  if docker exec namenode hdfs dfs -mkdir -p /raw/bonds /raw/news >/dev/null 2>&1; then
-    info "Successfully initialized HDFS directories."
-    break
-  fi
-  info "Waiting for NameNode to finish formatting/startup... ($i/15)"
-  sleep 2
-done
+    # 3. 파이프라인 기초 인프라 실행 (Zookeeper, Kafka, Hadoop HDFS)
+    info "Starting pipeline infrastructure services (Zookeeper, Kafka, Hadoop HDFS)..."
+    $COMPOSE_DATA up -d zookeeper kafka namenode datanode
 
-info "Data Pipeline Deployment Complete!"
-printf '%s\n' '--------------------------------------------------'
-printf '🚀 Data Pipeline Services are running at:\n'
-printf '  - Airflow UI    : http://localhost:8081\n'
-printf '  - Spark Master  : http://localhost:8080\n'
-printf '  - Flink UI      : http://localhost:8082\n'
-printf '  - Hadoop Web UI : http://localhost:9870\n'
-printf '%s\n' '--------------------------------------------------'
-printf 'Use "docker compose -f docker-compose-data.yml logs -f" to watch logs.\n'
+    # 4. 나머지 파이프라인 서비스 실행 (Airflow, Spark, Flink, News Crawler)
+    info "Starting all remaining data pipeline services..."
+    $COMPOSE_DATA up -d
+
+    # 5. Glossary 데이터 적재 실행 (news-crawler가 실행 중이어야 함)
+    info "Loading Glossary data from CSV into PostgreSQL..."
+    $COMPOSE_DATA exec news-crawler python glossary/glossary_pipeline.py --load
+
+    # 6. HDFS 디렉토리 초기 설정 (/raw/bonds, /raw/news)
+    info "Initializing HDFS directories (/raw/bonds, /raw/news)..."
+    for i in $(seq 1 15); do
+      if docker exec namenode hdfs dfs -mkdir -p /raw/bonds /raw/news >/dev/null 2>&1; then
+        info "Successfully initialized HDFS directories."
+        break
+      fi
+      info "Waiting for NameNode to finish formatting/startup... ($i/15)"
+      sleep 2
+    done
+
+    info "Data Pipeline Deployment Complete!"
+    printf '%s\n' '--------------------------------------------------'
+    printf '🚀 Data Pipeline Services are running at:\n'
+    printf '  - Airflow UI    : http://localhost:8081\n'
+    printf '  - Spark Master  : http://localhost:8080\n'
+    printf '  - Flink UI      : http://localhost:8082\n'
+    printf '  - Hadoop Web UI : http://localhost:9870\n'
+    printf '%s\n' '--------------------------------------------------'
+    ;;
+  down)
+    info "Stopping data pipeline services..."
+    $COMPOSE_DATA down
+    ;;
+  logs)
+    info "Viewing logs for data pipeline services..."
+    $COMPOSE_DATA logs -f
+    ;;
+  *)
+    usage
+    ;;
+esac
