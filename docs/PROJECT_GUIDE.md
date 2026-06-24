@@ -96,7 +96,7 @@ graph TD
 ./data.sh
 ```
 > [!NOTE]
-> 이 스크립트는 `de_net`과 `web_net` 네트워크가 생성되어 있는지 확인 후, DB 서비스가 기동 중인지 모니터링합니다. DB가 활성화된 것을 감지하면 파이프라인 서비스들을 실행하고, Kafka 및 Hadoop 디렉토리를 초기화하며, 마지막으로 기초 CSV 데이터를 데이터베이스에 로드합니다.
+> 이 스크립트는 `de_net`과 `web_net` 네트워크가 생성되어 있는지 확인 후, DB 서비스가 기동 중인지 모니터링합니다. 만약 DB 서비스가 실행 중이지 않다면 필수 인프라(`db`, `elasticsearch`)를 자동으로 먼저 구동시킵니다. 이후 파이프라인 서비스들을 실행하고, Kafka 및 Hadoop 디렉토리를 초기화하며, 마지막으로 기초 CSV 데이터를 데이터베이스에 로드합니다.
 
 ---
 
@@ -131,7 +131,7 @@ graph TD
 *   **역할**: 분산 메시지 큐, 분산 스토리지, 분산 분석 엔진, 데이터 파이프라인 기동.
 *   **핵심 동작**:
     1. 외부 도커 네트워크 `de_net`, `web_net` 생성 여부 검사 및 미존재 시 자동 생성
-    2. 다른 컴포즈 세션의 `db` 컨테이너 작동 여부 감지 (감지 실패 시 자동 기동 중단)
+    2. 다른 컴포즈 세션의 `db` 컨테이너 작동 여부 감지 및 미구동 시 자동 기동 (`db`, `elasticsearch` 인프라만 구동)
     3. `zookeeper`, `kafka`, `namenode`, `datanode` 1차 기동
     4. Airflow, Spark, Flink, News-crawler, Logstash 2차 기동
     5. `news-crawler`를 이용한 기초 Glossary DB 데이터 로드
@@ -141,10 +141,9 @@ graph TD
 
 ## 🚨 문제 해결 가이드 (Troubleshooting)
 
-### Q1. "Database container for service 'db' is not running" 에러가 발생합니다.
-> [!WARNING]
-> 이 오류는 `./service.sh`를 구동하지 않은 상태에서 `./data.sh`만 단독 실행했을 때 발생합니다.
-> 먼저 `./service.sh`를 구동하여 기본적인 데이터베이스 컨테이너를 실행시켜 주십시오.
+### Q1. 서비스(Backend, Frontend) 없이 데이터 파이프라인만 실행할 수 있나요?
+> [!TIP]
+> 네, 가능합니다. `./data.sh`를 단독 실행하면, 필수 공통 인프라인 PostgreSQL(`db`)과 `elasticsearch`가 구동되어 있지 않은 경우 자동으로 실행하고 데이터 수집 및 파이프라인 서비스를 구동합니다. 이 경우 Django 백엔드와 Vue 프론트엔드 웹 서비스는 가동되지 않으므로 시스템 리소스를 크게 절약할 수 있습니다.
 
 ### Q2. 도커 네트워크 충돌이나 `external network ... not found` 에러가 납니다.
 > [!TIP]

@@ -31,12 +31,20 @@ wait_for_healthy_app_service() {
   timeout="${2:-120}"
   elapsed=0
 
-  # dev.sh가 실행 중인지 우선 확인
+  # DB 서비스가 실행 중인지 확인하고, 없으면 자동으로 구동
   container_id="$($COMPOSE_APP ps -q "$service" 2>/dev/null || true)"
   if [ -z "$container_id" ]; then
-    error "Database container for service '$service' is not running."
-    error "Please run './service.sh' first to start the database and application infrastructure."
-    exit 1
+    info "Database container for service '$service' is not running."
+    info "Starting required infrastructure (db, elasticsearch) automatically..."
+    if ! $COMPOSE_APP up -d db elasticsearch; then
+      error "Failed to start database and elasticsearch services."
+      exit 1
+    fi
+    container_id="$($COMPOSE_APP ps -q "$service" 2>/dev/null || true)"
+    if [ -z "$container_id" ]; then
+      error "Database container for service '$service' is still not running."
+      exit 1
+    fi
   fi
 
   while [ "$elapsed" -lt "$timeout" ]; do
