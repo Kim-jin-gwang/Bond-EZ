@@ -13,20 +13,8 @@ data-pjt/airflow/dags/__pycache__/
 # PostgreSQL actual data
 data-pjt/postgres_data/
 
-# Data files
-*.csv
-*.pdf
-
-.env
-postgres_data
-
-# Airflow logs and temp files
-data-pjt/airflow/logs/
-data-pjt/airflow/plugins/__pycache__/
-data-pjt/airflow/dags/__pycache__/
-
-# PostgreSQL actual data
-data-pjt/postgres_data/
+# Hadoop actual data
+data-pjt/hadoop_data/
 
 # Python cache
 __pycache__/

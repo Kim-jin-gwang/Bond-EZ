@@ -298,13 +298,16 @@ def run_db_load(csv_path):
         return False
 
     try:
-        conn = psycopg2.connect(
-            host=DB_HOST,
-            port=DB_PORT,
-            database=POSTGRES_DB,
-            user=POSTGRES_USER,
-            password=POSTGRES_PASSWORD
-        )
+        conn_params = {
+            "host": DB_HOST,
+            "port": DB_PORT,
+            "database": POSTGRES_DB,
+            "user": POSTGRES_USER,
+            "password": POSTGRES_PASSWORD
+        }
+        if DB_HOST != "db":
+            conn_params["sslmode"] = "require"
+        conn = psycopg2.connect(**conn_params)
         cur = conn.cursor()
     except Exception as e:
         print(f"Database connection failed: {e}")
@@ -315,7 +318,7 @@ def run_db_load(csv_path):
         print("Syncing Glossary categories...")
         for cat_name, cat_id in CATEGORIES.items():
             cur.execute("""
-                INSERT INTO "GlossaryCategory" (category_id, category_name, created_at, updated_at)
+                INSERT INTO glossary_category (category_id, category_name, created_at, updated_at)
                 VALUES (%s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 ON CONFLICT (category_id) DO UPDATE SET category_name = EXCLUDED.category_name;
             """, (cat_id, cat_name))
@@ -338,7 +341,7 @@ def run_db_load(csv_path):
                     difficulty = "기초"
 
                 cur.execute("""
-                    INSERT INTO "Glossary" (term_id, category_id, term_name, difficulty, description, example_text, created_at, updated_at)
+                    INSERT INTO glossary (term_id, category_id, term_name, difficulty, description, example_text, created_at, updated_at)
                     VALUES (%s, %s, %s, %s::difficulty_enum, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                     ON CONFLICT (term_id) DO UPDATE SET
                         category_id = EXCLUDED.category_id,
