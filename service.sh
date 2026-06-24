@@ -4,20 +4,19 @@ set -eu
 # 스크립트를 어디서 실행하든 프로젝트 루트 기준으로 동작하게 이동합니다.
 cd "$(dirname "$0")"
 
-# docker compose 서비스 이름입니다. docker-compose.yml의 services 키와 맞아야 합니다.
-COMPOSE="docker compose"
+# docker compose 명령어 설정
+COMPOSE="docker compose -f docker-compose.yml"
 DB_SERVICE="db"
 BACKEND_SERVICE="backend"
-FRONTEND_SERVICE="frontend"
 
 # 진행 상황을 보기 좋게 출력합니다.
 info() {
-  printf '\n\033[1;34m[dev]\033[0m %s\n' "$1"
+  printf '\n\033[1;34m[service]\033[0m %s\n' "$1"
 }
 
 # 에러 메시지를 보기 좋게 출력합니다.
 error() {
-  printf '\n\033[1;31m[dev:error]\033[0m %s\n' "$1" >&2
+  printf '\n\033[1;31m[service:error]\033[0m %s\n' "$1" >&2
 }
 
 # 필요한 명령어가 설치되어 있는지 확인할 때 사용합니다.
@@ -99,33 +98,35 @@ if [ ! -f ".env" ]; then
   fi
 fi
 
-# Docker 캐시를 사용하므로 변경이 없으면 빠르게 지나갑니다.
-# requirements.txt, package.json, Dockerfile 변경을 사람이 판단하지 않아도 됩니다.
-info "Building Docker images. Docker will reuse cache when nothing changed."
-$COMPOSE build "$BACKEND_SERVICE" "$FRONTEND_SERVICE"
+# 1. 전체 프로젝트 빌드
+info "Building application Docker images..."
+$COMPOSE build
 
-# backend가 DB에 너무 빨리 접속하지 않도록 DB부터 먼저 실행합니다.
-info "Starting database."
-$COMPOSE up -d "$DB_SERVICE"
+# 2. 인프라 서비스 먼저 실행 (DB, Elasticsearch, Kibana)
+info "Starting infrastructure services (DB, Elasticsearch, Kibana)..."
+$COMPOSE up -d db elasticsearch kibana
 
-# healthcheck가 healthy가 될 때까지 기다린 뒤 backend를 실행합니다.
-info "Waiting for database healthcheck."
-wait_for_healthy "$DB_SERVICE" 120
+# 3. DB 준비 대기
+info "Waiting for database to be healthy..."
+wait_for_healthy "$DB_SERVICE"
 
-# DB 준비가 끝났으므로 Django와 Vite 개발 서버를 실행합니다.
-info "Starting backend and frontend."
-$COMPOSE up -d "$BACKEND_SERVICE" "$FRONTEND_SERVICE"
+# 4. 애플리케이션 서비스 실행 (Backend, Frontend)
+info "Starting Django backend and Vue frontend..."
+$COMPOSE up -d
 
-# 새 DB이거나 migration이 추가된 경우를 위해 항상 migrate를 실행합니다.
-# 이미 적용된 migration은 Django가 알아서 건너뜁니다.
-info "Applying Django migrations."
+# 5. Django 마이그레이션 적용
+info "Applying Django migrations..."
 $COMPOSE exec "$BACKEND_SERVICE" python manage.py migrate
 
-# .env에 포트가 지정되어 있으면 그 값을, 없으면 compose 기본값을 출력합니다.
+# 접속 정보 출력
 FRONTEND_PORT="$(env_value_or_default FRONTEND_PORT 5173)"
 BACKEND_PORT="$(env_value_or_default BACKEND_PORT 8000)"
 
-info "Done."
-printf 'Frontend: http://localhost:%s\n' "$FRONTEND_PORT"
-printf 'Backend : http://localhost:%s\n' "$BACKEND_PORT"
-printf '\nUse "docker compose logs -f" to watch logs.\n'
+info "Application Services Deployment Complete!"
+printf '%s\n' '--------------------------------------------------'
+printf '🚀 Services are running at:\n'
+printf '  - Frontend      : http://localhost:%s\n' "$FRONTEND_PORT"
+printf '  - Backend API   : http://localhost:%s\n' "$BACKEND_PORT"
+printf '  - Kibana UI     : http://localhost:5601\n'
+printf '%s\n' '--------------------------------------------------'
+printf 'Use "docker compose -f docker-compose.yml logs -f" to watch logs.\n'

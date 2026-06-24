@@ -1,7 +1,41 @@
 services:
+  # --- Infrastructure ---
+  elasticsearch:
+    build:
+      context: ./data-pjt/logstash
+      dockerfile: Dockerfile.elasticsearch
+    container_name: elasticsearch
+    restart: always
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "${ELASTICSEARCH_PORT:-9200}:9200"
+    volumes:
+      - ./data-pjt/elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - de_net
+      - web_net
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.13.4
+    container_name: kibana
+    restart: always
+    environment:
+      - ELASTICSEARCH_HOSTS=${ELASTICSEARCH_HOSTS:-http://elasticsearch:9200}
+    ports:
+      - "${KIBANA_PORT:-5601}:5601"
+    depends_on:
+      - elasticsearch
+    networks:
+      - de_net
+      - web_net
+
   db:
     container_name: postgres
     image: pgvector/pgvector:pg16
+    restart: always
     stdin_open: true
     tty: true
     volumes:
@@ -20,10 +54,12 @@ services:
     networks:
       - de_net
 
+  # --- Application Services ---
   backend:
     build:
       context: ./backend-pjt
       dockerfile: Dockerfile.dev
+    container_name: django-backend
     restart: always
     stdin_open: true
     tty: true
@@ -33,6 +69,9 @@ services:
       - "${BACKEND_PORT:-8000}:8000"
     env_file:
       - .env
+    environment:
+      - ELASTICSEARCH_HOSTS=${ELASTICSEARCH_HOSTS:-http://elasticsearch:9200}
+      - ELASTICSEARCH_BONDS_INDEX=${ELASTICSEARCH_BONDS_INDEX:-bonds_search}
     command: python manage.py runserver 0.0.0.0:8000
     depends_on:
       db:
@@ -45,6 +84,7 @@ services:
     build:
       context: ./frontend-pjt
       dockerfile: Dockerfile.dev
+    container_name: vue-frontend
     stdin_open: true
     tty: true
     volumes:
@@ -60,6 +100,8 @@ services:
 
 networks:
   de_net:
+    name: de_net
     driver: bridge
   web_net:
+    name: web_net
     driver: bridge
