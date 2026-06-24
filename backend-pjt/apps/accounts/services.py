@@ -77,6 +77,48 @@ def update_user(user, data):
     if "email" in data and User.objects.exclude(id=user.id).filter(email=user.email).exists():
         return ("EMAIL_ALREADY_EXISTS", "이미 사용 중인 이메일입니다.", {"field": "email"})
 
-    user.save(update_fields=[*allowed_fields])
+    password = data.get("password")
+    password_confirm = data.get("password_confirm")
+    if password:
+        if password != password_confirm:
+            return ("PASSWORD_CONFIRM_MISMATCH", "비밀번호 확인이 일치하지 않습니다.", {"field": "password_confirm"})
+        try:
+            validate_password(password, user=user)
+        except Exception as e:
+            msg = getattr(e, "messages", [str(e)])[0]
+            return ("PASSWORD_VALIDATION_FAILED", msg, {"field": "password"})
+        user.set_password(password)
+
+    user.save()
     return None
+
+
+from .models import UserSearchLog
+
+def record_search_log(user, session_key, params):
+    keyword = (params.get("keyword") or params.get("q") or "").strip()
+    
+    filters = {}
+    filter_keys = [
+        "bond_type", "credit_rating", "rating_group", "issuer_id", 
+        "industry_id", "seniority", "guarantee_status", "option_type", 
+        "interest_type", "payment_cycle_months", "maturity_from", 
+        "maturity_to", "min_coupon", "max_coupon"
+    ]
+    for key in filter_keys:
+        value = params.get(key)
+        if value:
+            if isinstance(value, str):
+                value = value.strip()
+            filters[key] = value
+            
+    if keyword or filters:
+        db_user = user if (user and user.is_authenticated) else None
+        UserSearchLog.objects.create(
+            user=db_user,
+            session_key=session_key,
+            keyword=keyword or None,
+            filters=filters
+        )
+
 

@@ -55,7 +55,7 @@ def logout(request):
 
 
 @csrf_exempt
-@require_http_methods(["GET", "PATCH"])
+@require_http_methods(["GET", "PATCH", "DELETE"])
 def me(request):
     auth_error = require_authenticated_user(request)
     if auth_error:
@@ -63,6 +63,12 @@ def me(request):
 
     if request.method == "GET":
         return ok({"user": serialize_user(request.user)})
+
+    if request.method == "DELETE":
+        user = request.user
+        logout_user(request)
+        user.delete()
+        return ok({}, status=204)
 
     body = parse_json_body(request)
     if body is None:
@@ -73,4 +79,9 @@ def me(request):
         error_code, message, details = service_error
         return error(error_code, message, details=details)
 
+    if "password" in body:
+        from django.contrib.auth import update_session_auth_hash
+        update_session_auth_hash(request, request.user)
+
     return ok({"user": serialize_user(request.user)})
+
