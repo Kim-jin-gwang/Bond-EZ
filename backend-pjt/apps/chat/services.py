@@ -264,8 +264,8 @@ def _build_langchain_messages(history, question, current_page=None, page_params=
 
     messages = [SystemMessage(content=system_content)]
     
-    # Add conversation history
-    for message in history.messages[-8:]:
+    # Add conversation history (최적화: 이력 범위를 최근 4개로 제한하여 컨텍스트 사이즈 축소)
+    for message in history.messages[-4:]:
         if message.type in ("human", "user"):
             messages.append(HumanMessage(content=message.content))
         elif message.type in ("ai", "assistant"):
@@ -285,32 +285,24 @@ def _try_gemini_answer(history, question, current_page=None, page_params=None, t
     except ImportError:
         return None
 
-    configured_model = os.environ.get("GEMINI_CHAT_MODEL")
-    model_candidates = [
-        configured_model,
-        "gemini-2.5-flash",
-        "gemini-2.0-flash",
-    ]
-
-    for model in dict.fromkeys(candidate for candidate in model_candidates if candidate):
-        try:
-            kwargs = {
-                "model": model,
-                "temperature": 0.2,
-                "google_api_key": api_key,
-                "max_retries": 0,
-                "model_kwargs": {"response_mime_type": "application/json"}
-            }
-            if api_key and not api_key.startswith("AIzaSy"):
-                kwargs["transport"] = "rest"
-                kwargs["client_options"] = {"api_endpoint": "https://gms.ssafy.io/gmsapi/generativelanguage.googleapis.com"}
-            llm = ChatGoogleGenerativeAI(**kwargs)
-            response = llm.invoke(_build_langchain_messages(history, question, current_page, page_params, topic))
-            return response.content
-        except Exception:
-            continue
-
-    return None
+    # 최적화: 모델 후보 리트라이 루프 대신 단일 주 모델 타겟팅 고정
+    model = os.environ.get("GEMINI_CHAT_MODEL", "gemini-2.5-flash")
+    try:
+        kwargs = {
+            "model": model,
+            "temperature": 0.2,
+            "google_api_key": api_key,
+            "max_retries": 0,
+            "model_kwargs": {"response_mime_type": "application/json"}
+        }
+        if api_key and not api_key.startswith("AIzaSy"):
+            kwargs["transport"] = "rest"
+            kwargs["client_options"] = {"api_endpoint": "https://gms.ssafy.io/gmsapi/generativelanguage.googleapis.com"}
+        llm = ChatGoogleGenerativeAI(**kwargs)
+        response = llm.invoke(_build_langchain_messages(history, question, current_page, page_params, topic))
+        return response.content
+    except Exception:
+        return None
 
 
 def _try_openai_answer(history, question, current_page=None, page_params=None, topic="General"):
