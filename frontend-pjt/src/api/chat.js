@@ -1,4 +1,4 @@
-import { apiPost } from './client'
+import { API_BASE_URL } from './client'
 
 const SESSION_STORAGE_KEY = 'bond_chat_session_id'
 
@@ -11,12 +11,25 @@ export function getChatSessionId() {
   return sessionId
 }
 
-export function sendChatMessage(message, currentPage = null, pageParams = {}) {
-  return apiPost('/chat', {
-    session_id: getChatSessionId(),
-    message,
-    current_page: currentPage,
-    page_params: pageParams,
+export async function sendChatMessageStream(message, currentPage = null, pageParams = {}) {
+  const response = await fetch(`${API_BASE_URL}/chat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+    },
+    body: JSON.stringify({
+      session_id: getChatSessionId(),
+      message,
+      current_page: currentPage,
+      page_params: pageParams,
+    }),
   })
+
+  if (!response.ok) {
+    throw new Error('채팅 답변 요청에 실패했습니다.')
+  }
+
+  return response.body.getReader()
 }
 

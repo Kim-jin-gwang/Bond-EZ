@@ -1,10 +1,10 @@
+from django.http import StreamingHttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-from apps.common.responses import error, ok, parse_json_body
+from apps.common.responses import error, parse_json_body
 
-from .history import serialize_history
-from .services import answer_chat
+from .services import answer_chat_stream
 
 
 @csrf_exempt
@@ -25,14 +25,14 @@ def chat_message(request):
     if not message:
         return error("CHAT_MESSAGE_REQUIRED", "message가 필요합니다.", details={"field": "message"})
 
-    result = answer_chat(session_id, message, current_page=current_page, page_params=page_params)
-    return ok(
-        {
-            "session_id": session_id,
-            "answer": result["answer"],
-            "sources": result.get("sources", []),
-            "recommended_questions": result.get("recommended_questions", []),
-            "navigation_recommendations": result.get("navigation_recommendations", []),
-            "history": serialize_history(session_id),
-        }
-    )
+    # SSE Event Generator
+    def event_stream():
+        for chunk in answer_chat_stream(session_id, message, current_page=current_page, page_params=page_params):
+            yield chunk
+
+    response = StreamingHttpResponse(event_stream(), content_type="text/event-stream")
+    # Disable caching & proxy buffering (critical for real-time SSE streaming)
+    response["X-Accel-Buffering"] = "no"
+    response["Cache-Control"] = "no-cache"
+    return response
+
