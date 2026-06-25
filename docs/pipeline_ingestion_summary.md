@@ -139,6 +139,65 @@ graph TD
 
 ## 4. 전체 데이터베이스 테이블별 실시간 적재 현황
 
+### ① 관계형 데이터베이스 ERD 다이어그램
+![관계형 DB ERD 다이어그램](../images/ERD.jpg)
+
+#### 📝 Mermaid 텍스트 ERD (마크다운 백업 시각화)
+```mermaid
+erDiagram
+    Users ||--o{ UsersInterest : "has interest"
+    Bonds ||--o{ UsersInterest : "is interested in"
+    News }|--|| NewsProvider : "published by"
+    Glossary }|--|| GlossaryCategory : "belongs to"
+
+    Users {
+        int user_id PK
+        varchar username
+        varchar email
+    }
+    UsersInterest {
+        bigint user_interest_id PK
+        bigint user_id FK
+        bigint bond_id FK
+        date added_at
+    }
+    Bonds {
+        bigint bond_id PK
+        varchar bond_code
+        varchar bond_name
+        varchar bond_type
+        varchar interest_type
+        float coupon_rate
+        varchar credit_rating
+        date issue_date
+        date maturity_date
+        bigint interest_cycle
+    }
+    News {
+        int news_id PK
+        varchar title
+        varchar content_snippet
+        date publish_date
+        varchar source_url
+        bigint source_id FK
+    }
+    NewsProvider {
+        bigint provider_id PK
+        varchar provider_name
+    }
+    Glossary {
+        int term_id PK
+        varchar term_name
+        text description
+        bigint category_id FK
+    }
+    GlossaryCategory {
+        bigint category_id PK
+        varchar category_name
+    }
+```
+
+### ② 테이블별 실시간 적재 현황
 현재 데이터베이스(`bonds_db`) 내의 모든 관계형 테이블은 **소문자 및 스네이크 케이스(Snake Case)** 명명 규칙을 적용하여 안정적으로 적재가 완료되었습니다.
 
 | 분류 | 테이블명 | 적재 건수 | 상태 및 목적 |
