@@ -326,7 +326,6 @@ def _try_gemini_answer(history, question, current_page=None, page_params=None, t
     except ImportError:
         return None
 
-    # 최적화: 모델 후보 리트라이 루프 대신 단일 주 모델 타겟팅 고정
     model = os.environ.get("GEMINI_CHAT_MODEL", "gemini-2.5-flash")
     try:
         kwargs = {
@@ -342,6 +341,34 @@ def _try_gemini_answer(history, question, current_page=None, page_params=None, t
         llm = ChatGoogleGenerativeAI(**kwargs)
         response = llm.invoke(_build_langchain_messages(history, question, current_page, page_params, topic))
         return response.content
+    except Exception:
+        return None
+
+
+def _try_gemini_stream(history, question, current_page=None, page_params=None, topic="General"):
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        return None
+
+    try:
+        from langchain_google_genai import ChatGoogleGenerativeAI
+    except ImportError:
+        return None
+
+    model = os.environ.get("GEMINI_CHAT_MODEL", "gemini-2.5-flash")
+    try:
+        kwargs = {
+            "model": model,
+            "temperature": 0.2,
+            "google_api_key": api_key,
+            "max_retries": 0,
+            "model_kwargs": {"response_mime_type": "application/json"}
+        }
+        if api_key and not api_key.startswith("AIzaSy"):
+            kwargs["transport"] = "rest"
+            kwargs["client_options"] = {"api_endpoint": "https://gms.ssafy.io/gmsapi/generativelanguage.googleapis.com"}
+        llm = ChatGoogleGenerativeAI(**kwargs)
+        return llm.stream(_build_langchain_messages(history, question, current_page, page_params, topic))
     except Exception:
         return None
 
@@ -365,6 +392,63 @@ def _try_openai_answer(history, question, current_page=None, page_params=None, t
     )
     response = llm.invoke(_build_langchain_messages(history, question, current_page, page_params, topic))
     return response.content
+
+
+def _try_openai_stream(history, question, current_page=None, page_params=None, topic="General"):
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        return None
+
+    try:
+        from langchain_openai import ChatOpenAI
+    except ImportError:
+        return None
+
+    llm = ChatOpenAI(
+        model=os.environ.get("OPENAI_CHAT_MODEL", "gpt-4o-mini"),
+        temperature=0.2,
+        api_key=api_key,
+        max_retries=0,
+        response_format={"type": "json_object"}
+    )
+    return llm.stream(_build_langchain_messages(history, question, current_page, page_params, topic))
+
+
+def answer_chat_stream(session_id, question, current_page=None, page_params=None):
+    history = get_session_history(session_id)
+    topic = _classify_topic(question)
+
+    stream = _try_gemini_stream(history, question, current_page, page_params, topic) or \
+             _try_openai_stream(history, question, current_page, page_params, topic)
+
+    accumulated = []
+    if stream:
+        for chunk in stream:
+            content = chunk.content
+            accumulated.append(content)
+            yield content
+        
+        # 스트리밍 완료 후 대화 이력 누적 저장
+        full_response = "".join(accumulated)
+        parsed = _parse_llm_json(full_response)
+        history.add_user_message(question)
+        history.add_ai_message(parsed["answer"])
+    else:
+        # 로컬 폴백 생성기
+        fallback_text = _fallback_answer(question)
+        fallback_json = json.dumps({
+            "answer": fallback_text,
+            "navigation_recommendations": [],
+            "recommended_questions": [
+                "듀레이션이 무엇인가요?",
+                "만기수익률(YTM)은 무엇인가요?",
+                "신용등급은 어떻게 결정되나요?"
+            ]
+        }, ensure_ascii=False)
+        yield fallback_json
+        
+        history.add_user_message(question)
+        history.add_ai_message(fallback_text)
 
 
 def _fallback_answer(question):
