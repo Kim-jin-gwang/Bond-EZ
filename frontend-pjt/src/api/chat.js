@@ -11,10 +11,12 @@ export function getChatSessionId() {
   return sessionId
 }
 
-export function sendChatMessage(message) {
+export function sendChatMessage(message, currentPage = null, pageParams = {}) {
   return apiPost('/chat', {
     session_id: getChatSessionId(),
     message,
+    current_page: currentPage,
+    page_params: pageParams,
   })
 }
 

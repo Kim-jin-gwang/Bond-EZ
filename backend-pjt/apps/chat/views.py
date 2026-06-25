@@ -16,6 +16,8 @@ def chat_message(request):
 
     session_id = str(payload.get("session_id") or "").strip()
     message = str(payload.get("message") or "").strip()
+    current_page = str(payload.get("current_page") or "").strip() or None
+    page_params = payload.get("page_params") or {}
 
     if not session_id:
         return error("CHAT_SESSION_ID_REQUIRED", "session_id가 필요합니다.", details={"field": "session_id"})
@@ -23,12 +25,14 @@ def chat_message(request):
     if not message:
         return error("CHAT_MESSAGE_REQUIRED", "message가 필요합니다.", details={"field": "message"})
 
-    result = answer_chat(session_id, message)
+    result = answer_chat(session_id, message, current_page=current_page, page_params=page_params)
     return ok(
         {
             "session_id": session_id,
             "answer": result["answer"],
-            "sources": result["sources"],
+            "sources": result.get("sources", []),
+            "recommended_questions": result.get("recommended_questions", []),
+            "navigation_recommendations": result.get("navigation_recommendations", []),
             "history": serialize_history(session_id),
         }
     )

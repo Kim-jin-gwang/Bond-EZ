@@ -135,7 +135,7 @@ button:disabled {
   background: var(--surface-raised);
 }
 
-.bond-chat-header div {
+.bond-chat-header-title {
   display: grid;
   gap: 2px;
 }
@@ -254,6 +254,74 @@ button:disabled {
   background: var(--primary);
   font-weight: 800;
 }
+
+.bond-chat-navigation-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+}
+
+.bond-chat-nav-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--primary);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.bond-chat-nav-button:hover {
+  background: var(--primary);
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.bond-chat-nav-button::after {
+  content: "→";
+  font-weight: 800;
+  margin-left: 8px;
+}
+
+.bond-chat-recommended-questions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+}
+
+.bond-chat-question-chip {
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.bond-chat-question-chip:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 5%, var(--surface));
+  transform: scale(1.02) translateY(-1px);
+}
+
 
 .gnb {
   position: sticky;
@@ -1431,3 +1499,130 @@ td span {
     transition: none;
   }
 }
+
+/* 챗봇 크기 조절 모드 및 헤더 조절 버튼 스타일 (개별 버튼 형태) */
+.bond-chat-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ctrl-btn {
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-raised);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.ctrl-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.ctrl-btn.active {
+  background: var(--primary) !important;
+  border-color: var(--primary) !important;
+  color: white !important;
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--primary) 24%, transparent);
+}
+
+.ctrl-btn.close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--surface-raised);
+}
+
+.ctrl-btn.close-btn:hover {
+  border-color: var(--danger) !important;
+  background: var(--danger) !important;
+  color: white !important;
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--danger) 24%, transparent);
+}
+
+
+/* 1. 기본 크기 (Normal Mode) */
+.bond-chat-panel.bond-chat-mode-normal {
+  width: min(420px, calc(100vw - 32px));
+  height: min(620px, calc(100vh - 126px));
+  right: 24px;
+  bottom: 94px;
+  border-radius: 8px;
+}
+
+/* 2. 더 크게 보기 (Large Mode) */
+.bond-chat-panel.bond-chat-mode-large {
+  width: min(580px, calc(100vw - 32px));
+  height: min(800px, calc(100vh - 126px));
+  right: 24px;
+  bottom: 94px;
+  border-radius: 8px;
+}
+
+/* 3. 사이드바 전환 (Sidebar Mode - GNB를 가리지 않는 15 z-index 및 top 오프셋) */
+.bond-chat-panel.bond-chat-mode-sidebar {
+  position: fixed;
+  right: 0;
+  top: 73px; /* GNB 높이 아래 배치 */
+  bottom: 0;
+  height: calc(100vh - 73px);
+  border-radius: 0;
+  border: 0;
+  border-left: 1px solid var(--line);
+  box-shadow: -8px 0 32px rgba(23, 43, 59, 0.08);
+  z-index: 15; /* GNB(z-index: 20) 뒤에 렌더링되게 설정 */
+}
+
+/* 사이드바 크기 조절을 위한 Resizer 마우스 핸들 */
+.sidebar-resizer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: ew-resize;
+  z-index: 100;
+  transition: background-color 0.2s ease;
+}
+
+.sidebar-resizer:hover,
+.bond-chat-panel.is-resizing .sidebar-resizer {
+  background-color: var(--primary);
+  opacity: 0.5;
+}
+
+.bond-chat-panel.is-resizing {
+  user-select: none; /* 크기 조절 시 글자 드래그 방지 */
+}
+
+@media (max-width: 640px) {
+  .bond-chat-panel.bond-chat-mode-normal,
+  .bond-chat-panel.bond-chat-mode-large,
+  .bond-chat-panel.bond-chat-mode-sidebar {
+    right: 0 !important;
+    bottom: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 0 !important;
+    z-index: 80 !important; /* 모바일 풀스크린 모드에선 전면 배치 */
+  }
+}
+
+
