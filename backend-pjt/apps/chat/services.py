@@ -1,8 +1,19 @@
 import os
 import json
 import re
+import time
 
 from .history import get_session_history
+
+# 최적화: 원격 DB RTT 지연 최소화를 위한 인메모리 캐시 선언
+_GLOSSARY_CACHE = {}
+_INDICATORS_CACHE = {"data": None, "timestamp": 0}
+_NEWS_CACHE = {"data": None, "timestamp": 0}
+
+GLOSSARY_CACHE_TTL = 1800  # 30분
+INDICATORS_CACHE_TTL = 600  # 10분
+NEWS_CACHE_TTL = 300  # 5분
+
 
 
 SYSTEM_POLICY = (
@@ -130,27 +141,46 @@ def _parse_llm_json(response_content):
 
 
 def _get_glossary_context(question):
-    try:
-        from apps.glossary.models import Glossary
-        matching_terms = []
-        for term in Glossary.objects.filter(deleted_at__isnull=True):
-            # Keyword matching check
-            if term.term_name.lower() in question.lower() or any(kw in question for kw in term.term_name.split()):
-                matching_terms.append(term)
+    global _GLOSSARY_CACHE
+    now = time.time()
+    
+    # 30분 캐시 체크 및 갱신
+    cache_entry = _GLOSSARY_CACHE.get("all_terms")
+    if cache_entry and (now - cache_entry["timestamp"] < GLOSSARY_CACHE_TTL):
+        all_terms = cache_entry["data"]
+    else:
+        try:
+            from apps.glossary.models import Glossary
+            all_terms = list(Glossary.objects.filter(deleted_at__isnull=True).values("term_name", "description", "example_text"))
+            _GLOSSARY_CACHE["all_terms"] = {"data": all_terms, "timestamp": now}
+        except Exception:
+            return ""
+
+    # 메모리 내 키워드 매칭 (DB 지연 없음)
+    matching_terms = []
+    for term in all_terms:
+        term_name = term["term_name"]
+        if term_name.lower() in question.lower() or any(kw in question for kw in term_name.split()):
+            matching_terms.append(term)
         
-        if matching_terms:
-            context = "\n\n[서비스 내 등록된 용어 사전 정보]"
-            for term in matching_terms[:3]:
-                context += f"\n- 용어명: {term.term_name}\n  설명: {term.description}"
-                if term.example_text:
-                    context += f"\n  예시: {term.example_text}"
-            return context
-    except Exception:
-        pass
+    if matching_terms:
+        context = "\n\n[서비스 내 등록된 용어 사전 정보]"
+        for term in matching_terms[:3]:
+            context += f"\n- 용어명: {term['term_name']}\n  설명: {term['description']}"
+            if term['example_text']:
+                context += f"\n  예시: {term['example_text']}"
+        return context
     return ""
 
 
 def _get_indicators_context():
+    global _INDICATORS_CACHE
+    now = time.time()
+    
+    # 10분 캐시 체크
+    if _INDICATORS_CACHE["data"] and (now - _INDICATORS_CACHE["timestamp"] < INDICATORS_CACHE_TTL):
+        return _INDICATORS_CACHE["data"]
+        
     try:
         from apps.indicators.models import BaseRate
         rates = BaseRate.objects.select_related("country").order_by("-created_at")[:3]
@@ -164,6 +194,8 @@ def _get_indicators_context():
                     f"\n  10년물 국채금리: {rate.ten_year_yield}%"
                     f"\n  스프레드(10년 - 3년): {rate.yield_curve_spread}%"
                 )
+            _INDICATORS_CACHE["data"] = context
+            _INDICATORS_CACHE["timestamp"] = now
             return context
     except Exception:
         pass
@@ -171,6 +203,13 @@ def _get_indicators_context():
 
 
 def _get_news_context():
+    global _NEWS_CACHE
+    now = time.time()
+    
+    # 5분 캐시 체크
+    if _NEWS_CACHE["data"] and (now - _NEWS_CACHE["timestamp"] < NEWS_CACHE_TTL):
+        return _NEWS_CACHE["data"]
+        
     try:
         from apps.news.models import News
         articles = News.objects.filter(deleted_at__isnull=True).order_by("-published_at")[:3]
@@ -182,6 +221,8 @@ def _get_news_context():
                     f"\n  요약: {art.summary}"
                     f"\n  게시일: {art.published_at}"
                 )
+            _NEWS_CACHE["data"] = context
+            _NEWS_CACHE["timestamp"] = now
             return context
     except Exception:
         pass
