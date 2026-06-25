@@ -196,6 +196,17 @@ def filtered_bonds(params):
     if max_ytm:
         queryset = queryset.filter(latest_market_data__ytm__lte=max_ytm)
 
+    has_price = params.get("has_price")
+    if has_price in ("true", True, "True", 1, "1"):
+        if has_normal_bonds():
+            queryset = queryset.filter(latest_market_data__price__isnull=False)
+
+    exclude_expired = params.get("exclude_expired")
+    if exclude_expired in ("true", True, "True", 1, "1"):
+        from django.utils import timezone
+        today = timezone.now().date()
+        queryset = queryset.filter(maturity_date__gte=today)
+
     ordering_map = {
         "maturity_asc": "maturity_date",
         "maturity_desc": "-maturity_date",

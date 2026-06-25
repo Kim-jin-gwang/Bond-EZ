@@ -31,6 +31,8 @@ const selectedFilters = ref({
   seniorities: props.marketSearch?.filters?.seniorities || [],
   guaranteeStatuses: props.marketSearch?.filters?.guaranteeStatuses || [],
 })
+const showOnlyWithPrice = ref(true)
+const excludeExpired = ref(true)
 const bonds = ref([])
 const isLoading = ref(false)
 const error = ref(null)
@@ -140,7 +142,7 @@ watch(() => props.marketSearch, (newVal) => {
 const visibleBonds = computed(() => bonds.value)
 const pageButtons = computed(() => getPageButtons(currentPage.value, pageInfo.value.totalPages))
 
-watch([searchKeyword, selectedFilters], () => {
+watch([searchKeyword, selectedFilters, showOnlyWithPrice, excludeExpired], () => {
   currentPage.value = 1
   loadBonds()
 }, { deep: true })
@@ -248,6 +250,14 @@ function buildBondParams() {
     page: currentPage.value,
     size: BOND_PAGE_SIZE,
     keyword: searchKeyword.value.trim(),
+  }
+
+  if (showOnlyWithPrice.value) {
+    params.has_price = true
+  }
+
+  if (excludeExpired.value) {
+    params.exclude_expired = true
   }
 
   if (filters.bondTypes.length) params.bond_type = filters.bondTypes
@@ -471,15 +481,25 @@ onMounted(() => {
         <h1 aria-live="polite">{{ isCuratedMode ? '나에게 맞춰 큐레이션된 추천 채권이 ' + bonds.length + '개 있습니다' : pageInfo.totalElements + '개의 채권이 검색되었습니다' }}</h1>
         <p class="selection-help">비교할 채권을 최대 2개까지 선택하세요. 현재 {{ selectedBonds.length }}/2개 선택</p>
       </div>
-      <button
-        class="compare-fab"
-        :class="{ enabled: canCompare }"
-        type="button"
-        :disabled="!canCompare"
-        @click="compareSelectedBonds"
-      >
-        비교하기
-      </button>
+      <div class="toolbar-actions" style="display: flex; align-items: center; gap: 16px;">
+        <label class="price-filter-toggle" style="display: flex; align-items: center; gap: 6px; font-weight: 500; cursor: pointer; user-select: none;">
+          <input type="checkbox" v-model="showOnlyWithPrice" />
+          <span>거래 중인 채권만 보기</span>
+        </label>
+        <label class="expired-filter-toggle" style="display: flex; align-items: center; gap: 6px; font-weight: 500; cursor: pointer; user-select: none; margin-right: 8px;">
+          <input type="checkbox" v-model="excludeExpired" />
+          <span>만기된 채권 제외</span>
+        </label>
+        <button
+          class="compare-fab"
+          :class="{ enabled: canCompare }"
+          type="button"
+          :disabled="!canCompare"
+          @click="compareSelectedBonds"
+        >
+          비교하기
+        </button>
+      </div>
     </div>
 
     <div v-if="selectedBonds.length" class="comparison-selection" aria-label="선택한 비교 대상">
@@ -522,7 +542,7 @@ onMounted(() => {
             <th>분류</th>
             <th>현재가</th>
             <th>등락률</th>
-            <th>매수/매도 수익률</th>
+            <th>표면 금리</th>
             <th>옵션/행사일</th>
             <th>만기/이자</th>
             <th>상세</th>
@@ -557,7 +577,7 @@ onMounted(() => {
             </td>
             <td class="price">{{ bond.price }}</td>
             <td :class="bond.change.startsWith('+') ? 'up' : 'down'">{{ bond.change }}</td>
-            <td class="yields">{{ bond.buyYield }} / {{ bond.sellYield }}</td>
+            <td class="yields">{{ bond.coupon }}</td>
             <td class="option-cell">
               <strong>{{ formatOptionLabel(bond.option) }}</strong>
               <span class="nowrap">{{ bond.optionExercise?.startDate1 || '-' }}</span>

@@ -23,7 +23,29 @@ def is_master_bond(bond):
 
 
 def rating_group(value):
+    if not value or value == "NONE":
+        return None
     return (value or "").rstrip("+-0123456789") or value
+
+
+def get_clean_rating(bond):
+    if is_master_bond(bond):
+        val = bond.credit_rating
+    else:
+        val = bond.rating.rating_name if (hasattr(bond, "rating") and bond.rating) else getattr(bond, "credit_rating", None)
+    
+    if not val or val == "NONE":
+        return None, None
+        
+    if is_master_bond(bond):
+        group = rating_group(val)
+    else:
+        group = bond.rating.rating_group if (hasattr(bond, "rating") and bond.rating) else rating_group(val)
+        
+    if group == "NONE":
+        group = None
+        
+    return val, group
 
 
 def payment_cycle_months(value):
@@ -129,6 +151,7 @@ def get_latest_market_data(bond, allow_fallback=True):
 
 
 def serialize_bond_list_item(bond):
+    rating_name, group_name = get_clean_rating(bond)
     if is_master_bond(bond):
         return {
             "bond_id": bond.isin_code,
@@ -145,8 +168,8 @@ def serialize_bond_list_item(bond):
                 },
             },
             "bond_type": bond.bond_type,
-            "credit_rating": bond.credit_rating,
-            "rating_group": rating_group(bond.credit_rating),
+            "credit_rating": rating_name,
+            "rating_group": group_name,
             "seniority": bond.seniority,
             "guarantee_status": bond.guarantee_status,
             "coupon_rate": number_or_none(bond.coupon_rate),
@@ -176,8 +199,8 @@ def serialize_bond_list_item(bond):
             },
         },
         "bond_type": bond.bond_type.bond_type,
-        "credit_rating": bond.rating.rating_name,
-        "rating_group": bond.rating.rating_group,
+        "credit_rating": rating_name,
+        "rating_group": group_name,
         "seniority": bond.seniority.seniority_name,
         "guarantee_status": bond.guarantee_status.guarantee_status,
         "coupon_rate": number_or_none(bond.coupon_rate),
@@ -203,6 +226,7 @@ def serialize_bond_detail(bond):
 
     summary = generate_rule_based_summary(bond)
     summary_terms = terms_in_text(" ".join(summary))
+    rating_name, group_name = get_clean_rating(bond)
 
     if is_master_bond(bond):
         return {
@@ -217,8 +241,8 @@ def serialize_bond_detail(bond):
                 "issuer_name": bond.company_name,
                 "industry_name": bond.industry,
                 "bond_type": bond.bond_type,
-                "credit_rating": bond.credit_rating,
-                "rating_group": rating_group(bond.credit_rating),
+                "credit_rating": rating_name,
+                "rating_group": group_name,
                 "seniority": bond.seniority,
                 "guarantee_status": bond.guarantee_status,
             },
@@ -268,8 +292,8 @@ def serialize_bond_detail(bond):
             "issuer_name": bond.issuer.issuer_name,
             "industry_name": bond.issuer.industry.industry_name,
             "bond_type": bond.bond_type.bond_type,
-            "credit_rating": bond.rating.rating_name,
-            "rating_group": bond.rating.rating_group,
+            "credit_rating": rating_name,
+            "rating_group": group_name,
             "seniority": bond.seniority.seniority_name,
             "guarantee_status": bond.guarantee_status.guarantee_status,
         },
@@ -346,6 +370,7 @@ def serialize_bond_compare_item(bond):
     latest_market_data = get_latest_market_data(bond)
     cashflow = bond.cashflow_rule
     option = bond.option_exercise
+    rating_name, group_name = get_clean_rating(bond)
 
     return {
         "bond_id": bond.id,
@@ -356,8 +381,8 @@ def serialize_bond_compare_item(bond):
         "issuer_name": bond.issuer.issuer_name,
         "industry_name": bond.issuer.industry.industry_name,
         "bond_type": bond.bond_type.bond_type,
-        "credit_rating": bond.rating.rating_name,
-        "rating_group": bond.rating.rating_group,
+        "credit_rating": rating_name,
+        "rating_group": group_name,
         "seniority": bond.seniority.seniority_name,
         "guarantee_status": bond.guarantee_status.guarantee_status,
         "issue_date": date_or_none(bond.issue_date),

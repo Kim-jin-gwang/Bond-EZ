@@ -36,17 +36,13 @@ const INDICATOR_META = {
 
 export function fetchIndicators() {
   return cachedQuery('indicators:list', async () => {
-    try {
-      const data = await apiGet('/indicators')
-      const summaries = getItems(data)
+    const data = await apiGet('/indicators')
+    const summaries = getItems(data)
 
-      if (!summaries.length) return []
+    if (!summaries.length) return []
 
-      const indicators = await Promise.all(summaries.map(fetchIndicatorDetail))
-      return indicators.filter(Boolean)
-    } catch {
-      return []
-    }
+    const indicators = await Promise.all(summaries.map(fetchIndicatorDetail))
+    return indicators.filter(Boolean)
   })
 }
 

@@ -356,7 +356,7 @@ CREATE TABLE IF NOT EXISTS bond_market_data (
 
 -- 8-1. bond_type 시드 데이터
 INSERT INTO bond_type (bond_type) VALUES
-('특수채'), ('금융채'), ('MBS'), ('지방채'), ('일반회사채'), ('지방공사채'), ('유동화SPC채'), ('유사집합투자기구채')
+('특수채'), ('금융채'), ('MBS'), ('지방채'), ('일반회사채'), ('지방공사채'), ('유동화SPC채'), ('유사집합투자기구채'), ('국채')
 ON CONFLICT (bond_type) DO NOTHING;
 
 -- 8-2. seniority 시드 데이터
@@ -375,7 +375,8 @@ ON CONFLICT (guarantee_status) DO NOTHING;
 INSERT INTO credit_rating (rating_name, rating_order) VALUES
 ('AAA', 1), ('AA+', 2), ('AA0', 3), ('AA-', 4), ('A+', 5), ('A0', 6), ('A-', 7),
 ('BBB+', 8), ('BBB0', 9), ('BBB-', 10), ('BB+', 11), ('BB0', 12), ('BB-', 13),
-('B+', 14), ('B0', 15), ('B-', 16), ('CCC', 17), ('CC', 18), ('C', 19), ('D', 20)
+('B+', 14), ('B0', 15), ('B-', 16), ('CCC', 17), ('CC', 18), ('C', 19), ('D', 20),
+('NONE', 21)
 ON CONFLICT (rating_name) DO NOTHING;
 
 -- 9. Staging 테이블에서 12개 정규화 테이블로 변환하는 PL/pgSQL 함수 생성
@@ -457,9 +458,13 @@ BEGIN
         END IF;
 
         -- 신용등급 ID 조회
-        SELECT rating_id INTO v_rating_id FROM credit_rating WHERE rating_name = r.credit_rating;
-        IF v_rating_id IS NULL THEN
-            SELECT rating_id INTO v_rating_id FROM credit_rating WHERE rating_name = 'BBB-';
+        IF r.credit_rating IS NULL OR r.credit_rating = '' OR r.credit_rating = 'NONE' OR r.credit_rating = '국채' THEN
+            SELECT rating_id INTO v_rating_id FROM credit_rating WHERE rating_name = 'NONE';
+        ELSE
+            SELECT rating_id INTO v_rating_id FROM credit_rating WHERE rating_name = r.credit_rating;
+            IF v_rating_id IS NULL THEN
+                SELECT rating_id INTO v_rating_id FROM credit_rating WHERE rating_name = 'NONE';
+            END IF;
         END IF;
 
         -- 옵션 타입 매핑
