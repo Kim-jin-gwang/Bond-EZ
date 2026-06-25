@@ -1,7 +1,7 @@
 <script setup>
 import { computed, nextTick, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { sendChatMessage } from '../../api/chat'
+import { sendChatMessageStream } from '../../api/chat'
 import { useNavigation } from '../../composables/useNavigation'
 
 const route = useRoute()
@@ -39,6 +39,20 @@ function toggleChat() {
   }
 }
 
+// 스트리밍중인 JSON에서 answer 텍스트만 실시간으로 파싱하는 정규식 도구
+function parseStreamingAnswer(accumulatedText) {
+  const match = accumulatedText.match(/"answer"\s*:\s*"((?:[^"\\]|\\.)*)/)
+  if (match) {
+    let rawAnswer = match[1]
+    return rawAnswer
+      .replace(/\\n/g, '\n')
+      .replace(/\\t/g, '\t')
+      .replace(/\\"/g, '"')
+      .replace(/\\\\/g, '\\')
+  }
+  return ''
+}
+
 async function handleSubmit(customText = null) {
   const text = customText !== null ? customText.trim() : input.value.trim()
   if (!text || isSending.value) return
@@ -63,16 +77,63 @@ async function handleSubmit(customText = null) {
   try {
     const currentPage = route.meta.page || 'home'
     const pageParams = route.params || {}
-    const result = await sendChatMessage(text, currentPage, pageParams)
     
-    messages.value.push({
-      id: crypto.randomUUID(),
+    // 스트리밍 연결 요청
+    const reader = await sendChatMessageStream(text, currentPage, pageParams)
+    const decoder = new TextDecoder()
+    let accumulatedText = ''
+
+    // 빈 답변 객체를 먼저 목록에 추가
+    const assistantMessageId = crypto.randomUUID()
+    const assistantMessage = ref({
+      id: assistantMessageId,
       role: 'assistant',
-      content: result.answer,
-      sources: result.sources || [],
-      recommendedQuestions: result.recommended_questions || [],
-      navigationRecommendations: result.navigation_recommendations || []
+      content: '답변을 구성하는 중입니다...', // 초기 로딩 표시
+      sources: [],
+      recommendedQuestions: [],
+      navigationRecommendations: []
     })
+    messages.value.push(assistantMessage.value)
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      
+      const chunk = decoder.decode(value, { stream: true })
+      accumulatedText += chunk
+      
+      // 실시간으로 answer 텍스트만 발췌하여 노출
+      const streamAnswer = parseStreamingAnswer(accumulatedText)
+      if (streamAnswer) {
+        assistantMessage.value.content = streamAnswer
+      }
+      await nextTick(scrollToBottom)
+    }
+
+    // 스트리밍이 완전히 종료되면 최종 JSON 파싱하여 추천 및 액션 버튼들 로드
+    try {
+      let finalJson = accumulatedText.trim()
+      const match = finalJson.match(/```json\s*(.*?)\s*```/s)
+      if (match) {
+        finalJson = match[1].trim()
+      } else {
+        const jsonMatch = finalJson.match(/(\{.*\})/s)
+        if (jsonMatch) {
+          finalJson = jsonMatch[1].trim()
+        }
+      }
+      
+      const parsed = JSON.parse(finalJson)
+      if (parsed) {
+        assistantMessage.value.content = parsed.answer || assistantMessage.value.content
+        assistantMessage.value.sources = parsed.sources || []
+        assistantMessage.value.recommendedQuestions = parsed.recommended_questions || []
+        assistantMessage.value.navigationRecommendations = parsed.navigation_recommendations || []
+      }
+    } catch (e) {
+      console.warn('최종 응답 JSON 파싱 실패, 누적 텍스트를 대체용으로 사용합니다.', e)
+    }
+
   } catch (error) {
     errorMessage.value = error.message || '답변을 불러오지 못했습니다.'
   } finally {
