@@ -1,6 +1,6 @@
 # 💵 개인 투자자를 위한 스마트 채권 포털 - 채권이지(BondEZ)
 
-> **🌐 Live Demo:** 준비 중 — [demo-gateway.trealight112.workers.dev](https://demo-gateway.trealight112.workers.dev/)에서 곧 공개됩니다.
+> **🌐 Live Demo:** **[bond-ez.pages.dev](https://bond-ez.pages.dev)** — 회원가입 없이 둘러볼 수 있고, 가입하면 즐겨찾기·맞춤 추천까지 체험할 수 있어요. (무료 백엔드 서버라 첫 접속 시 데이터 로딩에 최대 1분 걸릴 수 있습니다)
 
 개인 투자자에게 필요한 **채권 기본 정보, 이자 지급 일정, 신용등급, 실시간 관련 뉴스, 금융 용어 사전**을 자동으로 수집·가공하여 한눈에 볼 수 있도록 통합 서빙하는 **채권이지(BondEZ)** 서비스입니다.
 
