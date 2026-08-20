@@ -328,16 +328,19 @@ def _try_gemini_answer(history, question, current_page=None, page_params=None, t
 
     model = os.environ.get("GEMINI_CHAT_MODEL", "gemini-2.5-flash")
     try:
+        # 정식 Google AI Studio 키(AIzaSy...)만 지원한다.
+        # (과거에는 SSAFY 내부 프록시로 우회했으나 외부에서 접근 불가한 주소라
+        # 요청이 무한 대기하는 문제가 있어 제거 — 키가 다르면 규칙 기반 폴백 사용)
+        if not api_key.startswith("AIzaSy"):
+            return None
         kwargs = {
             "model": model,
             "temperature": 0.2,
             "google_api_key": api_key,
             "max_retries": 0,
+            "timeout": 30,
             "model_kwargs": {"response_mime_type": "application/json"}
         }
-        if api_key and not api_key.startswith("AIzaSy"):
-            kwargs["transport"] = "rest"
-            kwargs["client_options"] = {"api_endpoint": "https://gms.ssafy.io/gmsapi/generativelanguage.googleapis.com"}
         llm = ChatGoogleGenerativeAI(**kwargs)
         response = llm.invoke(_build_langchain_messages(history, question, current_page, page_params, topic))
         return response.content
@@ -357,16 +360,19 @@ def _try_gemini_stream(history, question, current_page=None, page_params=None, t
 
     model = os.environ.get("GEMINI_CHAT_MODEL", "gemini-2.5-flash")
     try:
+        # 정식 Google AI Studio 키(AIzaSy...)만 지원한다.
+        # (과거에는 SSAFY 내부 프록시로 우회했으나 외부에서 접근 불가한 주소라
+        # 요청이 무한 대기하는 문제가 있어 제거 — 키가 다르면 규칙 기반 폴백 사용)
+        if not api_key.startswith("AIzaSy"):
+            return None
         kwargs = {
             "model": model,
             "temperature": 0.2,
             "google_api_key": api_key,
             "max_retries": 0,
+            "timeout": 30,
             "model_kwargs": {"response_mime_type": "application/json"}
         }
-        if api_key and not api_key.startswith("AIzaSy"):
-            kwargs["transport"] = "rest"
-            kwargs["client_options"] = {"api_endpoint": "https://gms.ssafy.io/gmsapi/generativelanguage.googleapis.com"}
         llm = ChatGoogleGenerativeAI(**kwargs)
         return llm.stream(_build_langchain_messages(history, question, current_page, page_params, topic))
     except Exception:

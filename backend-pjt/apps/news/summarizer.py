@@ -76,11 +76,15 @@ def get_summary_llm():
 
     model = getattr(settings, "NEWS_SUMMARY_LM_MODEL", "gemini-2.5-flash")
     model = model.split("/")[-1]  # 과거 'gemini/...' litellm 표기 호환
+    if not api_key.startswith("AIzaSy"):
+        raise NewsSummaryConfigError("정식 Google AI Studio 키(AIzaSy...)가 필요합니다.")
     return ChatGoogleGenerativeAI(
         model=model,
         google_api_key=api_key,
         temperature=getattr(settings, "NEWS_SUMMARY_LM_TEMPERATURE", 0.2),
         max_output_tokens=getattr(settings, "NEWS_SUMMARY_LM_MAX_TOKENS", 2048),
+        timeout=30,
+        max_retries=1,
     )
 
 
