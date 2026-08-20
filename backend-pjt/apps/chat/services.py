@@ -337,6 +337,7 @@ def _try_gemini_answer(history, question, current_page=None, page_params=None, t
             "google_api_key": api_key,
             "max_retries": 0,
             "timeout": 30,
+            "transport": "rest",  # gRPC는 일부 환경에서 timeout을 무시하고 매달림
             "model_kwargs": {"response_mime_type": "application/json"}
         }
         llm = ChatGoogleGenerativeAI(**kwargs)
@@ -367,6 +368,7 @@ def _try_gemini_stream(history, question, current_page=None, page_params=None, t
             "google_api_key": api_key,
             "max_retries": 0,
             "timeout": 30,
+            "transport": "rest",  # gRPC는 일부 환경에서 timeout을 무시하고 매달림
             "model_kwargs": {"response_mime_type": "application/json"}
         }
         llm = ChatGoogleGenerativeAI(**kwargs)
@@ -416,6 +418,20 @@ def _try_openai_stream(history, question, current_page=None, page_params=None, t
     return llm.stream(_build_langchain_messages(history, question, current_page, page_params, topic))
 
 
+def _next_with_deadline(iterator, seconds=12):
+    """이터레이터의 다음 값을 데드라인 안에 가져온다. 초과/실패 시 None."""
+    import concurrent.futures
+
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    future = executor.submit(lambda: next(iterator, None))
+    try:
+        return future.result(timeout=seconds)
+    except Exception:
+        return None
+    finally:
+        executor.shutdown(wait=False)
+
+
 def answer_chat_stream(session_id, question, current_page=None, page_params=None):
     history = get_session_history(session_id)
     topic = _classify_topic(question)
@@ -426,15 +442,22 @@ def answer_chat_stream(session_id, question, current_page=None, page_params=None
     accumulated = []
     stream_failed = False
     if stream:
-        # llm.stream()은 지연 평가라 실제 API 오류가 반복(iteration) 시점에 발생한다.
-        # 여기서 잡지 않으면 스트리밍 도중 500으로 끊기므로 폴백으로 전환한다.
-        try:
-            for chunk in stream:
-                content = chunk.content
-                accumulated.append(content)
-                yield content
-        except Exception:
-            stream_failed = not accumulated  # 이미 일부를 보냈다면 그대로 종료
+        # llm.stream()은 지연 평가라 실제 API 오류/지연이 반복(iteration) 시점에 발생한다.
+        # 라이브러리 timeout이 전송 계층에 따라 무시될 수 있으므로,
+        # 첫 토큰을 스레드 데드라인(12초)으로 기다리고 넘기면 즉시 폴백한다.
+        first_chunk = _next_with_deadline(stream, seconds=12)
+        if first_chunk is None:
+            stream_failed = True
+        else:
+            try:
+                accumulated.append(first_chunk.content)
+                yield first_chunk.content
+                for chunk in stream:
+                    content = chunk.content
+                    accumulated.append(content)
+                    yield content
+            except Exception:
+                pass  # 이미 일부를 보냈다면 그대로 종료
 
         if accumulated:
             # 스트리밍 완료 후 대화 이력 누적 저장

@@ -83,6 +83,7 @@ def get_summary_llm():
         max_output_tokens=getattr(settings, "NEWS_SUMMARY_LM_MAX_TOKENS", 2048),
         timeout=30,
         max_retries=1,
+        transport="rest",
     )
 
 
