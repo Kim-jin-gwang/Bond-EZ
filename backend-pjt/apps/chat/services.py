@@ -329,7 +329,7 @@ def _try_gemini_answer(history, question, current_page=None, page_params=None, t
     except ImportError:
         return None
 
-    model = os.environ.get("GEMINI_CHAT_MODEL", "gemini-2.5-flash")
+    model = os.environ.get("GEMINI_CHAT_MODEL", "gemini-3.6-flash")
     try:
         # 과거에는 키 접두사에 따라 SSAFY 내부 프록시로 우회했으나, 외부에서
         # 접근 불가한 주소라 요청이 무한 대기하는 문제가 있어 제거했다.
@@ -344,7 +344,7 @@ def _try_gemini_answer(history, question, current_page=None, page_params=None, t
         }
         llm = ChatGoogleGenerativeAI(**kwargs)
         response = llm.invoke(_build_langchain_messages(history, question, current_page, page_params, topic))
-        return response.content
+        return _content_to_text(response.content)
     except Exception as exc:
         logger.warning("Gemini answer failed: %s: %s", type(exc).__name__, exc)
         return None
@@ -360,7 +360,7 @@ def _try_gemini_stream(history, question, current_page=None, page_params=None, t
     except ImportError:
         return None
 
-    model = os.environ.get("GEMINI_CHAT_MODEL", "gemini-2.5-flash")
+    model = os.environ.get("GEMINI_CHAT_MODEL", "gemini-3.6-flash")
     try:
         # 과거에는 키 접두사에 따라 SSAFY 내부 프록시로 우회했으나, 외부에서
         # 접근 불가한 주소라 요청이 무한 대기하는 문제가 있어 제거했다.
@@ -421,6 +421,23 @@ def _try_openai_stream(history, question, current_page=None, page_params=None, t
     return llm.stream(_build_langchain_messages(history, question, current_page, page_params, topic))
 
 
+def _content_to_text(content):
+    """LLM 응답 content를 순수 텍스트로 정규화한다.
+    (신형 Gemini 모델은 문자열 대신 [{'type': 'text', 'text': ...}] 블록 리스트를 반환)
+    """
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for part in content:
+            if isinstance(part, dict):
+                parts.append(str(part.get("text", "")))
+            else:
+                parts.append(str(part))
+        return "".join(parts)
+    return str(content or "")
+
+
 def _next_with_deadline(iterator, seconds=12):
     """이터레이터의 다음 값을 데드라인 안에 가져온다. 초과/실패 시 None."""
     import concurrent.futures
@@ -454,10 +471,11 @@ def answer_chat_stream(session_id, question, current_page=None, page_params=None
             stream_failed = True
         else:
             try:
-                accumulated.append(first_chunk.content)
-                yield first_chunk.content
+                first_text = _content_to_text(first_chunk.content)
+                accumulated.append(first_text)
+                yield first_text
                 for chunk in stream:
-                    content = chunk.content
+                    content = _content_to_text(chunk.content)
                     accumulated.append(content)
                     yield content
             except Exception:
