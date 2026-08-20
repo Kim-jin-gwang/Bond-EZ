@@ -424,18 +424,25 @@ def answer_chat_stream(session_id, question, current_page=None, page_params=None
              _try_openai_stream(history, question, current_page, page_params, topic)
 
     accumulated = []
+    stream_failed = False
     if stream:
-        for chunk in stream:
-            content = chunk.content
-            accumulated.append(content)
-            yield content
-        
-        # 스트리밍 완료 후 대화 이력 누적 저장
-        full_response = "".join(accumulated)
-        parsed = _parse_llm_json(full_response)
-        history.add_user_message(question)
-        history.add_ai_message(parsed["answer"])
-    else:
+        # llm.stream()은 지연 평가라 실제 API 오류가 반복(iteration) 시점에 발생한다.
+        # 여기서 잡지 않으면 스트리밍 도중 500으로 끊기므로 폴백으로 전환한다.
+        try:
+            for chunk in stream:
+                content = chunk.content
+                accumulated.append(content)
+                yield content
+        except Exception:
+            stream_failed = not accumulated  # 이미 일부를 보냈다면 그대로 종료
+
+        if accumulated:
+            # 스트리밍 완료 후 대화 이력 누적 저장
+            full_response = "".join(accumulated)
+            parsed = _parse_llm_json(full_response)
+            history.add_user_message(question)
+            history.add_ai_message(parsed["answer"])
+    if not stream or stream_failed:
         # 로컬 폴백 생성기
         fallback_text = _fallback_answer(question)
         fallback_json = json.dumps({
