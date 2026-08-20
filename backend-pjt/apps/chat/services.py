@@ -340,7 +340,6 @@ def _try_gemini_answer(history, question, current_page=None, page_params=None, t
             "google_api_key": api_key,
             "max_retries": 0,
             "timeout": 30,
-            "transport": "rest",  # gRPC는 일부 환경에서 timeout을 무시하고 매달림
             "model_kwargs": {"response_mime_type": "application/json"}
         }
         llm = ChatGoogleGenerativeAI(**kwargs)
@@ -372,7 +371,6 @@ def _try_gemini_stream(history, question, current_page=None, page_params=None, t
             "google_api_key": api_key,
             "max_retries": 0,
             "timeout": 30,
-            "transport": "rest",  # gRPC는 일부 환경에서 timeout을 무시하고 매달림
             "model_kwargs": {"response_mime_type": "application/json"}
         }
         llm = ChatGoogleGenerativeAI(**kwargs)
