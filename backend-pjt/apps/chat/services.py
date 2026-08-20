@@ -328,11 +328,9 @@ def _try_gemini_answer(history, question, current_page=None, page_params=None, t
 
     model = os.environ.get("GEMINI_CHAT_MODEL", "gemini-2.5-flash")
     try:
-        # 정식 Google AI Studio 키(AIzaSy...)만 지원한다.
-        # (과거에는 SSAFY 내부 프록시로 우회했으나 외부에서 접근 불가한 주소라
-        # 요청이 무한 대기하는 문제가 있어 제거 — 키가 다르면 규칙 기반 폴백 사용)
-        if not api_key.startswith("AIzaSy"):
-            return None
+        # 과거에는 키 접두사에 따라 SSAFY 내부 프록시로 우회했으나, 외부에서
+        # 접근 불가한 주소라 요청이 무한 대기하는 문제가 있어 제거했다.
+        # 잘못된 키는 timeout/에러로 빠르게 실패하고 규칙 기반 폴백이 동작한다.
         kwargs = {
             "model": model,
             "temperature": 0.2,
@@ -360,11 +358,9 @@ def _try_gemini_stream(history, question, current_page=None, page_params=None, t
 
     model = os.environ.get("GEMINI_CHAT_MODEL", "gemini-2.5-flash")
     try:
-        # 정식 Google AI Studio 키(AIzaSy...)만 지원한다.
-        # (과거에는 SSAFY 내부 프록시로 우회했으나 외부에서 접근 불가한 주소라
-        # 요청이 무한 대기하는 문제가 있어 제거 — 키가 다르면 규칙 기반 폴백 사용)
-        if not api_key.startswith("AIzaSy"):
-            return None
+        # 과거에는 키 접두사에 따라 SSAFY 내부 프록시로 우회했으나, 외부에서
+        # 접근 불가한 주소라 요청이 무한 대기하는 문제가 있어 제거했다.
+        # 잘못된 키는 timeout/에러로 빠르게 실패하고 규칙 기반 폴백이 동작한다.
         kwargs = {
             "model": model,
             "temperature": 0.2,
