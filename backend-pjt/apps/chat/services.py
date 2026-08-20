@@ -340,7 +340,7 @@ def _try_gemini_answer(history, question, current_page=None, page_params=None, t
             "google_api_key": api_key,
             "max_retries": 0,
             "timeout": 30,
-            "model_kwargs": {"response_mime_type": "application/json"}
+            "response_mime_type": "application/json",
         }
         llm = ChatGoogleGenerativeAI(**kwargs)
         response = llm.invoke(_build_langchain_messages(history, question, current_page, page_params, topic))
@@ -371,7 +371,7 @@ def _try_gemini_stream(history, question, current_page=None, page_params=None, t
             "google_api_key": api_key,
             "max_retries": 0,
             "timeout": 30,
-            "model_kwargs": {"response_mime_type": "application/json"}
+            "response_mime_type": "application/json",
         }
         llm = ChatGoogleGenerativeAI(**kwargs)
         return llm.stream(_build_langchain_messages(history, question, current_page, page_params, topic))
