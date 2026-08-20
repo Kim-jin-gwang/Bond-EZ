@@ -466,7 +466,7 @@ def answer_chat_stream(session_id, question, current_page=None, page_params=None
         # llm.stream()은 지연 평가라 실제 API 오류/지연이 반복(iteration) 시점에 발생한다.
         # 라이브러리 timeout이 전송 계층에 따라 무시될 수 있으므로,
         # 첫 토큰을 스레드 데드라인(12초)으로 기다리고 넘기면 즉시 폴백한다.
-        first_chunk = _next_with_deadline(stream, seconds=12)
+        first_chunk = _next_with_deadline(stream, seconds=20)
         if first_chunk is None:
             stream_failed = True
         else:
