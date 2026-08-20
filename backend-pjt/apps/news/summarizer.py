@@ -1,6 +1,5 @@
 import re
 from functools import lru_cache
-from pathlib import Path
 
 from django.conf import settings
 
@@ -44,10 +43,9 @@ def summarize_news_content(title, content):
         raise NewsSummaryInputError()
 
     try:
-        prediction = get_summarizer()(title=cleaned_title, content=cleaned_content[:CONTENT_MAX_CHARS])
-        summary = clean_summary(extract_summary(prediction))
-        if not summary:
-            summary = clean_summary(generate_direct_summary(cleaned_title, cleaned_content[:CONTENT_MAX_CHARS]))
+        summary = clean_summary(
+            generate_llm_summary(cleaned_title, cleaned_content[:CONTENT_MAX_CHARS])
+        )
     except NewsSummarizerError:
         raise
     except Exception as exc:
@@ -62,91 +60,51 @@ def summarize_news_content(title, content):
     return summary
 
 
+# NOTE: 기존에는 dspy로 요약 프로그램을 구성했으나, dspy가 매우 무거워
+# (litellm/optuna/pandas 연쇄 의존) 무료 호스팅 메모리에 부적합하여
+# 이미 챗봇에 사용 중인 langchain-google-genai 직접 호출로 교체했다.
+# 요약 검증/교정/추출 폴백 로직은 그대로 유지된다.
 @lru_cache(maxsize=1)
-def get_summarizer():
-    dspy = import_dspy()
-    configure_dspy(dspy)
+def get_summary_llm():
+    api_key = clean_secret(getattr(settings, "GEMINI_API_KEY", ""))
+    if not api_key:
+        raise NewsSummaryConfigError("GEMINI_API_KEY를 설정해 주세요.")
+    try:
+        from langchain_google_genai import ChatGoogleGenerativeAI
+    except ImportError as exc:
+        raise NewsSummaryConfigError("langchain-google-genai 패키지가 설치되어 있지 않습니다.") from exc
 
-    class SummarizeNews(dspy.Signature):
-        """Summarize a Korean financial news article in one or two concise sentences.
-
-        Preserve concrete facts such as institutions, rates, markets, bonds,
-        dates, amounts, and policy direction. Ignore ads, reporter bios,
-        copyright notices, and related links.
-        """
-
-        title: str = dspy.InputField(desc="News article title")
-        content: str = dspy.InputField(desc="Cleaned article body")
-        summary: str = dspy.OutputField(
-            desc=(
-                f"One or two complete Korean declarative sentences within {SUMMARY_MAX_CHARS} characters. "
-                "It must preserve the main market subject and action, and must not end with a broken noun "
-                "fragment such as '시총다.' or '전환다.'."
-            )
-        )
-
-    class NewsSummarizer(dspy.Module):
-        def __init__(self):
-            super().__init__()
-            self.summarize = dspy.Predict(SummarizeNews)
-
-        def forward(self, title, content):
-            return self.summarize(title=title, content=content)
-
-    program = NewsSummarizer()
-    program_path = getattr(settings, "NEWS_SUMMARY_DSPY_PROGRAM_PATH", "")
-    if program_path:
-        program_path = Path(program_path)
-        if not program_path.is_absolute():
-            program_path = settings.BASE_DIR / program_path
-        program.load(str(program_path))
-    return program
-
-
-def configure_dspy(dspy):
-    dspy.configure(lm=build_lm(dspy))
-
-
-def build_lm(dspy):
-    model = getattr(settings, "NEWS_SUMMARY_LM_MODEL", "")
-    api_key = get_lm_api_key(model)
-    if not model or not api_key:
-        raise NewsSummaryConfigError(
-            "NEWS_SUMMARY_LM_MODEL과 해당 API 키(OPENAI_API_KEY 또는 GEMINI_API_KEY)를 설정해 주세요."
-        )
-
-    kwargs = {
-        "temperature": getattr(settings, "NEWS_SUMMARY_LM_TEMPERATURE", 0.2),
-        "max_tokens": getattr(settings, "NEWS_SUMMARY_LM_MAX_TOKENS", 512),
-    }
-    if model.startswith("gemini/") and api_key and not api_key.startswith("AIzaSy"):
-        kwargs["api_base"] = "https://gms.ssafy.io/gmsapi/generativelanguage.googleapis.com/v1beta"
-
-    return dspy.LM(
-        model,
-        api_key=api_key,
-        **kwargs
+    model = getattr(settings, "NEWS_SUMMARY_LM_MODEL", "gemini-2.5-flash")
+    model = model.split("/")[-1]  # 과거 'gemini/...' litellm 표기 호환
+    return ChatGoogleGenerativeAI(
+        model=model,
+        google_api_key=api_key,
+        temperature=getattr(settings, "NEWS_SUMMARY_LM_TEMPERATURE", 0.2),
+        max_output_tokens=getattr(settings, "NEWS_SUMMARY_LM_MAX_TOKENS", 2048),
     )
 
 
-def get_lm_api_key(model):
-    if model.startswith("gemini/"):
-        return clean_secret(getattr(settings, "GEMINI_API_KEY", ""))
-    if model.startswith("openai/"):
-        return clean_secret(getattr(settings, "OPENAI_API_KEY", ""))
-    return clean_secret(getattr(settings, "NEWS_SUMMARY_LM_API_KEY", ""))
+def generate_llm_summary(title, content):
+    llm = get_summary_llm()
+    prompt = (
+        "다음 금융 뉴스 본문을 한국어 1~2문장으로 요약하세요.\n"
+        f"- {SUMMARY_MAX_CHARS}자 이내\n"
+        "- 기관명, 금리, 시장, 날짜, 금액, 정책 방향 같은 구체적 사실을 보존\n"
+        "- 광고, 기자명, 저작권 문구, 관련 링크는 제외\n"
+        "- 반드시 '~다.'로 끝나는 완결된 평서문으로 작성\n\n"
+        f"제목: {title}\n"
+        f"본문: {content}\n\n"
+        "요약:"
+    )
+    response = llm.invoke(prompt)
+    summary = getattr(response, "content", "") or ""
+    if isinstance(summary, list):  # 멀티파트 응답 방어
+        summary = " ".join(str(part) for part in summary)
+    return summary
 
 
 def clean_secret(value):
     return str(value or "").strip().strip('"').strip("'")
-
-
-def import_dspy():
-    try:
-        import dspy
-    except ImportError as exc:
-        raise NewsSummaryConfigError("dspy 패키지가 설치되어 있지 않습니다.") from exc
-    return dspy
 
 
 def normalize_text(value):
@@ -175,24 +133,6 @@ def extract_summary(prediction):
     if re.search(r"Prediction\s*\(", fallback):
         return ""
     return fallback
-
-
-def generate_direct_summary(title, content):
-    dspy = import_dspy()
-    lm = build_lm(dspy)
-    prompt = (
-        "다음 금융 뉴스 본문을 한국어 1~2문장으로 요약하세요.\n"
-        f"- {SUMMARY_MAX_CHARS}자 이내\n"
-        "- 광고, 기자명, 저작권 문구는 제외\n"
-        "- 반드시 '~다.'로 끝내기\n\n"
-        f"제목: {title}\n"
-        f"본문: {content}\n\n"
-        "요약:"
-    )
-    response = lm(prompt)
-    if isinstance(response, (list, tuple)):
-        return response[0] if response else ""
-    return response
 
 
 def clean_summary(summary):

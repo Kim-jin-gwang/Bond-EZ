@@ -10,10 +10,12 @@ from .summarizer import news_summary_metric, summarize_news_content
 
 class NewsSummarizerTests(SimpleTestCase):
     def test_replaces_incomplete_model_output_with_article_sentence(self):
-        prediction = Mock(summary="황성엽 금투협회장은 ETF 시장 과열과 삼")
         content = "황성엽 금융투자협회장은 ETF 시장의 과열 경쟁을 우려한다고 밝혔다."
 
-        with patch("apps.news.summarizer.get_summarizer", return_value=Mock(return_value=prediction)):
+        with patch(
+            "apps.news.summarizer.generate_llm_summary",
+            return_value="황성엽 금투협회장은 ETF 시장 과열과 삼",
+        ):
             summary = summarize_news_content("ETF 시장 과열 우려", content)
 
         self.assertEqual(summary, content)

@@ -1,13 +1,18 @@
-asgiref==3.11.1
+# Web
 Django==5.2.14
+asgiref==3.11.1
 sqlparse==0.5.5
 tzdata==2026.2
 psycopg2-binary==2.9.10
-langchain==0.3.27
+gunicorn==23.0.0
+whitenoise==6.7.0
+django-cors-headers==4.4.0
+python-dotenv==1.0.1
+
+# AI (챗봇 + 뉴스 요약 — Gemini)
 langchain-core==0.3.75
 langchain-google-genai==2.1.10
-langchain-openai==0.3.32
-elasticsearch==8.17.0
-dspy
+
+# 뉴스 본문 수집
 requests==2.32.5
 beautifulsoup4==4.13.3

@@ -1,8 +1,39 @@
 # 💵 개인 투자자를 위한 스마트 채권 포털 - 채권이지(BondEZ)
 
+> **🌐 Live Demo:** 준비 중 — [demo-gateway.trealight112.workers.dev](https://demo-gateway.trealight112.workers.dev/)에서 곧 공개됩니다.
+
 개인 투자자에게 필요한 **채권 기본 정보, 이자 지급 일정, 신용등급, 실시간 관련 뉴스, 금융 용어 사전**을 자동으로 수집·가공하여 한눈에 볼 수 있도록 통합 서빙하는 **채권이지(BondEZ)** 서비스입니다.
 
 이 프로젝트는 분산 메시지 큐(Kafka), 분산 파일 시스템(HDFS), 데이터 처리 클러스터(Spark/Flink), 그리고 워크플로우 엔진(Airflow)을 아우르는 **대용량 데이터 엔지니어링 파이프라인**을 구축하여 신뢰성 있고 유실 없는 데이터 유통 환경을 구성했습니다.
+
+---
+
+## ♻️ 라이브 데모 개편 (2026.08)
+
+전체 빅데이터 파이프라인은 무료 호스팅으로 상시 운영이 불가능하므로, **웹 레이어(Vue + Django + PostgreSQL)만 분리 배포**하고 파이프라인 산출물은 시드 데이터로 대체하는 데모 구성을 추가했습니다.
+
+```text
+[Frontend]                [Backend API]              [Database]
+Cloudflare Pages   ──▶    Render (Django+gunicorn) ──▶ Neon PostgreSQL
+frontend-pjt/dist         backend-pjt                  demo 스키마+시드
+```
+
+| 분류 | 내용 |
+|---|---|
+| **배포 인프라** | 프로덕션 설정 추가(CORS·교차 사이트 쿠키·WhiteNoise·gunicorn·DATABASE_URL), Elasticsearch는 무료 호스팅이 없어 **설계되어 있던 Postgres ORM 폴백**으로 대체 |
+| **DB 부트스트랩** | Django 마이그레이션(0001, `id` PK)과 파이프라인 스키마(`bond_id` PK)의 불일치 문제를 해결하는 `bootstrap_demo` 커맨드 신설 — 모델 정의 기준 스키마 생성 + 선택적 fake migrate + 시드 적재를 한 번에 처리 ([deploy/](backend-pjt/deploy/)) |
+| **버그 수정** | unmanaged 모델의 `db_column` 변경이 마이그레이션 상태에 누락되어 외부 앱 FK가 존재하지 않는 `bond(id)`를 참조하던 문제(0005 상태 정렬 마이그레이션), 챗봇 히스토리 전역 dict 무한 누적(LRU 캡 적용) |
+| **개선** | 뉴스 요약을 무거운 dspy 의존에서 **langchain-Gemini 직접 호출**로 교체(검증·교정 로직은 유지, 무료 호스팅 메모리 대응), `GOOGLE_API_KEY`로 잘못 안내되던 환경변수를 실제 코드가 읽는 `GEMINI_API_KEY`로 정정 |
+| **정리** | 미사용 mainpage 앱·dspy 전용 스크립트·Vite 스캐폴드 제거, API 명세 PDF는 docs/로 이동, requirements 경량화(dspy·elasticsearch·langchain 우산 패키지 제외) |
+
+**데모 백엔드 로컬 실행:**
+```bash
+cd backend-pjt
+pip install -r requirements.txt
+cp ../.env.example .env            # DATABASE_URL 등 채우기
+python manage.py bootstrap_demo    # 스키마 + 마이그레이션 + 시드 (재실행 안전)
+python manage.py runserver
+```
 
 ---
 

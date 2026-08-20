@@ -10,7 +10,8 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(django.conf.settings.AUTH_USER_MODEL),
-        ("bonds", "0001_initial"),
+        # bond FK가 최종 컬럼명(bond_id) 상태를 보고 생성되도록 상태 정렬 이후에 적용
+        ("bonds", "0005_state_align_bond_pk_column"),
     ]
 
     operations = [
