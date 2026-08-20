@@ -1,9 +1,12 @@
+import logging
 import os
 import json
 import re
 import time
 
 from .history import get_session_history
+
+logger = logging.getLogger(__name__)
 
 # 최적화: 원격 DB RTT 지연 최소화를 위한 인메모리 캐시 선언
 _GLOSSARY_CACHE = {}
@@ -343,7 +346,8 @@ def _try_gemini_answer(history, question, current_page=None, page_params=None, t
         llm = ChatGoogleGenerativeAI(**kwargs)
         response = llm.invoke(_build_langchain_messages(history, question, current_page, page_params, topic))
         return response.content
-    except Exception:
+    except Exception as exc:
+        logger.warning("Gemini answer failed: %s: %s", type(exc).__name__, exc)
         return None
 
 
@@ -373,7 +377,8 @@ def _try_gemini_stream(history, question, current_page=None, page_params=None, t
         }
         llm = ChatGoogleGenerativeAI(**kwargs)
         return llm.stream(_build_langchain_messages(history, question, current_page, page_params, topic))
-    except Exception:
+    except Exception as exc:
+        logger.warning("Gemini stream setup failed: %s: %s", type(exc).__name__, exc)
         return None
 
 
@@ -426,7 +431,8 @@ def _next_with_deadline(iterator, seconds=12):
     future = executor.submit(lambda: next(iterator, None))
     try:
         return future.result(timeout=seconds)
-    except Exception:
+    except Exception as exc:
+        logger.warning("Gemini first token failed/deadline: %s: %s", type(exc).__name__, exc)
         return None
     finally:
         executor.shutdown(wait=False)
