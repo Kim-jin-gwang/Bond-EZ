@@ -1,0 +1,47 @@
+# Bond-EZ 웹 데모 스택 (Vue + Django + PostgreSQL)
+# 전체 파이프라인 인프라(ES/Kibana/Logstash)는 루트의 docker-compose.yml 참고.
+# 실행: docker compose -f docker-compose.demo.yml up --build
+# → 프론트 http://localhost:5173 · 백엔드 API http://localhost:8000/api/v1
+# AI 챗봇/뉴스 요약까지 쓰려면: GEMINI_API_KEY=<키> docker compose -f docker-compose.demo.yml up --build
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: bondez
+      POSTGRES_PASSWORD: bondez
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d bondez"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - bondez-demo-pgdata:/var/lib/postgresql/data
+
+  backend:
+    build: ./backend-pjt
+    ports:
+      - "8000:8000"
+    environment:
+      # DEBUG=True: 로컬 http 환경에서 세션 쿠키가 동작하도록 (배포에선 False)
+      DEBUG: "True"
+      SECRET_KEY: local-docker-secret-change-me
+      DATABASE_URL: postgresql://postgres:bondez@db:5432/bondez?sslmode=disable
+      ALLOWED_HOSTS: localhost,127.0.0.1,backend
+      CORS_ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      CSRF_TRUSTED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend-pjt
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000/api/v1
+    depends_on:
+      - backend
+
+volumes:
+  bondez-demo-pgdata:
