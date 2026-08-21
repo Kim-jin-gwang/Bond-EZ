@@ -8,7 +8,8 @@
   1. deploy/demo_schema.sql  — 모델 정의와 일치하는 테이블/뷰 생성
   2. bonds/glossary/news 마이그레이션을 --fake 처리 (테이블은 1에서 이미 생성됨)
   3. 나머지 앱(accounts, indicators, portfolios, auth 등)은 실제 migrate
-  4. bond 테이블이 비어있으면 deploy/demo_seed.sql 로 시드 적재
+  4. deploy/demo_seed.sql 적재 — idempotent 시드가 시세를 CURRENT_DATE 기준
+     최근 90일 시계열로 재계산하므로, 서비스가 재기동할 때마다 데이터가 갱신됨
 
 Render 시작 커맨드 예:
   python manage.py bootstrap_demo && gunicorn config.wsgi:application ...
@@ -38,15 +39,8 @@ class Command(BaseCommand):
         self.stdout.write("[bootstrap] 3/4 나머지 앱 실제 마이그레이션...")
         call_command("migrate", interactive=False, verbosity=0)
 
-        self.stdout.write("[bootstrap] 4/4 시드 데이터 확인...")
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT COUNT(*) FROM bond")
-            bond_count = cursor.fetchone()[0]
-        if bond_count == 0:
-            self.stdout.write("[bootstrap] bond 테이블이 비어있어 demo_seed.sql 적재...")
-            self._run_sql_file(DEPLOY_DIR / "demo_seed.sql")
-        else:
-            self.stdout.write(f"[bootstrap] 기존 채권 {bond_count}건 존재 — 시드 생략")
+        self.stdout.write("[bootstrap] 4/4 demo_seed.sql 적재 (idempotent — 시세를 오늘 날짜 기준으로 갱신)...")
+        self._run_sql_file(DEPLOY_DIR / "demo_seed.sql")
 
         self.stdout.write(self.style.SUCCESS("[bootstrap] 완료"))
 
