@@ -26,7 +26,13 @@ frontend-pjt/dist         backend-pjt                  demo 스키마+시드
 | **개선** | 뉴스 요약을 무거운 dspy 의존에서 **langchain-Gemini 직접 호출**로 교체(검증·교정 로직은 유지, 무료 호스팅 메모리 대응), `GOOGLE_API_KEY`로 잘못 안내되던 환경변수를 실제 코드가 읽는 `GEMINI_API_KEY`로 정정 |
 | **정리** | 미사용 mainpage 앱·dspy 전용 스크립트·Vite 스캐폴드 제거, API 명세 PDF는 docs/로 이동, requirements 경량화(dspy·elasticsearch·langchain 우산 패키지 제외) |
 
-**데모 백엔드 로컬 실행:**
+**도커로 전체 스택 실행 (권장):**
+```bash
+docker compose up --build
+```
+→ 프론트 http://localhost:5173 · 백엔드 API http://localhost:8000/api/v1 · PostgreSQL까지 한 번에 뜨고, 데모 시드(오늘 날짜 기준 시세 90일 시계열)가 자동 적재됩니다. AI 챗봇/뉴스 요약까지 쓰려면 `GEMINI_API_KEY=<키> docker compose up --build`.
+
+**데모 백엔드 직접 실행:**
 ```bash
 cd backend-pjt
 pip install -r requirements.txt

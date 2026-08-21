@@ -1,13 +1,9 @@
+.git
 __pycache__
-*.py[cod]
-*$py.class
+*.pyc
 .venv
 venv
-ENV
-env
 .env
-db.sqlite3
-.vscode
-.git
-.dockerignore
+staticfiles/
 Dockerfile
+.dockerignore
