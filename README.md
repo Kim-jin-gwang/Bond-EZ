@@ -216,8 +216,11 @@ de_pjt/ (프로젝트 루트)
 │
 ├── monitoring/                     # 관제 시스템(Prometheus, Grafana) 설정 파일 폴더
 │
+├── docs/                           # 프로젝트 문서 (GETTING_STARTED, OPERATIONS_GUIDE, 기획서, API 명세 PDF 등)
+│
 ├── .env.example                    # 프로젝트 배포 시 복사하여 사용할 환경 설정 템플릿
 ├── docker-compose.yml              # 애플리케이션 서비스용 도커 컴포즈 파일 (Web/Search)
+├── docker-compose.demo.yml         # 웹 데모 스택 (Vue+Django+Postgres, 시드 자동 적재)
 ├── docker-compose-data.yml         # 데이터 파이프라인용 도커 컴포즈 파일 (Kafka/Hadoop/Spark/Airflow)
 ├── docker-compose-monitoring.yml    # 관제용 도커 컴포즈 파일 (Grafana/Prometheus)
 │
