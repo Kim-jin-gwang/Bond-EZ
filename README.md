@@ -1,16 +1,76 @@
-# 💵 개인 투자자를 위한 스마트 채권 포털 - 채권이지(BondEZ)
+# 💵 채권이지 (Bond-EZ)
 
-> **🌐 Live Demo:** **[bond-ez.pages.dev](https://bond-ez.pages.dev)** — 회원가입 없이 둘러볼 수 있고, 가입하면 즐겨찾기·맞춤 추천까지 체험할 수 있어요. (무료 백엔드 서버라 첫 접속 시 데이터 로딩에 최대 1분 걸릴 수 있습니다)
+> **흩어진 채권 정보를 한곳에 모아 보여줍니다.**
+> **Project Date:** 2026.05 ~ 2026.06 · **3인 팀 프로젝트**
+> **Platform:** Web (Vue 3 + Django REST API) · Kafka · Spark · Flink · Airflow · HDFS 데이터 파이프라인
+> **Role:** 데이터 엔지니어링 및 백엔드 아키텍처 리딩
+> **Live Demo:** [bond-ez.pages.dev](https://bond-ez.pages.dev) — 회원가입 없이 둘러볼 수 있고, 가입하면 즐겨찾기·맞춤 추천까지 체험 가능 (무료 백엔드 서버라 첫 접속 시 데이터 로딩에 최대 1분)
 
-개인 투자자에게 필요한 **채권 기본 정보, 이자 지급 일정, 신용등급, 실시간 관련 뉴스, 금융 용어 사전**을 자동으로 수집·가공하여 한눈에 볼 수 있도록 통합 서빙하는 **채권이지(BondEZ)** 서비스입니다.
+개인 투자자에게 필요한 **채권 기본 정보, 이자 지급 일정, 신용등급, 실시간 관련 뉴스, 금융 용어 사전**을 자동으로 수집·가공해 한 화면에서 보여주는 채권 통합 정보 포털입니다.
 
-이 프로젝트는 분산 메시지 큐(Kafka), 분산 파일 시스템(HDFS), 데이터 처리 클러스터(Spark/Flink), 그리고 워크플로우 엔진(Airflow)을 아우르는 **대용량 데이터 엔지니어링 파이프라인**을 구축하여 신뢰성 있고 유실 없는 데이터 유통 환경을 구성했습니다.
+매일 갱신되는 공시 데이터는 **배치(Airflow + Spark)** 로, 뉴스는 **실시간 스트리밍(Flink)** 으로 나눠 처리하고, 두 경로를 Kafka와 HDFS로 묶어 **장애가 나도 중단 지점부터 다시 처리하는** 데이터 파이프라인이 프로젝트의 본체입니다.
 
 ---
 
-## ♻️ 라이브 데모 개편 (2026.08)
+## 📱 실제 화면
 
-전체 빅데이터 파이프라인은 무료 호스팅으로 상시 운영이 불가능하므로, **웹 레이어(Vue + Django + PostgreSQL)만 분리 배포**하고 파이프라인 산출물은 시드 데이터로 대체하는 데모 구성을 추가했습니다.
+| 홈 | 채권 시세 | 투자 지표 |
+|:---:|:---:|:---:|
+| <img src="docs/images/screenshots/01-home.png" width="300" alt="홈 화면"/> | <img src="docs/images/screenshots/02-bond-list.png" width="300" alt="채권 시세 목록"/> | <img src="docs/images/screenshots/03-indicators.png" width="300" alt="투자 지표 화면"/> |
+| 조건 검색과 투자 판단 지표로 들어가는 첫 화면 | 종목명·발행기관으로 검색하고 수익률·만기를 한 표에서 비교 | 나라별 금리, 장단기 금리차, Yield Curve를 표와 그래프로 확인 |
+
+| 금리 뉴스 | 용어 사전 | 채권 가이드 |
+|:---:|:---:|:---:|
+| <img src="docs/images/screenshots/04-news.png" width="300" alt="금리 뉴스 화면"/> | <img src="docs/images/screenshots/05-dictionary.png" width="300" alt="채권 용어 사전"/> | <img src="docs/images/screenshots/06-guide.png" width="300" alt="채권 가이드"/> |
+| 금리·채권 뉴스를 모아 보고 AI 요약으로 확인 | 채권 용어를 분류별로 찾아 쉬운 설명과 예시로 확인 | 채권의 기본 개념과 투자 위험을 단계별로 안내 |
+
+> 화면은 [라이브 데모](https://bond-ez.pages.dev)에서 찍은 것입니다.
+
+---
+
+## 📖 프로젝트 개요
+
+채권 정보는 공시 사이트·증권사·뉴스 포털에 흩어져 있어, 기관 투자자에 비해 개인 투자자는 한 종목을 살펴보는 데도 여러 사이트를 오가야 합니다.
+채권이지는 그 공백을 **공공데이터 + 뉴스 크롤링 + 분산 데이터 파이프라인**으로 채웁니다.
+
+* **한 번에 조회** — 채권 스펙·이자 지급 일정·조기상환 옵션·일별 시세를 종목 단위로 통합
+* **매일 자동 갱신** — 공시 데이터는 매일 00시, 금리 지표는 매일 07시에 Airflow가 수집·적재
+* **쉬운 설명** — 뉴스는 LLM(Gemini)이 요약하고, 낯선 용어는 한국은행 경제금융용어 800선 기반 사전으로 풀이
+
+### 💡 주요 기능
+
+| 기능 | 설명 |
+|---|---|
+| 💵 **통합 채권 정보 조회** | 국채·금융채·회사채의 기본 스펙(표면금리, 만기일, 이자 주기)부터 이자 지급 현금흐름, 조기상환 옵션 일정까지 조회. 2개 채권 비교와 맞춤 추천 지원 |
+| 📰 **실시간 뉴스 · AI 요약** | 채권 시장·거시경제 뉴스를 실시간으로 수집하고 LLM(Gemini)으로 핵심 요약 제공 |
+| 📈 **거시경제 · 투자 지표** | 주요 국가 기준금리, 만기별 국고채 금리, 장단기 금리차(10Y-3Y), 예금 금리 비교, 신용등급별 평균 YTM 통계 |
+| 📚 **금융 용어 사전** | 한국은행 경제금융용어 800선을 난이도별(입문·기초·중요·심화)·카테고리별로 해설 |
+| 💬 **AI 투자 Q&A 챗봇** | 채권 지식·경제 지표·서비스 사용법 질문에 Gemini가 DB 조회 결과를 연동해 답변 |
+| 📂 **가상 포트폴리오 · 즐겨찾기** | 관심 채권을 즐겨찾기에 등록하고, 가상 매입 내역으로 나만의 포트폴리오 관리 |
+
+---
+
+## 🏗️ 아키텍처 — 7계층 데이터 파이프라인
+
+공시 데이터와 뉴스는 갱신 주기와 연산 무게가 다릅니다. 둘을 한 경로에 태우지 않고 **Kafka 토픽을 나눠 배치 경로와 실시간 경로로 이원화**했고, 전체를 수집 → 버퍼 → 저장 → 처리 → 서빙 → 모니터링 → 표현의 7계층으로 구성했습니다.
+
+<p align="center">
+  <img src="images/data_architecture_diagram.png" alt="채권이지 데이터 아키텍처 — 수집 · Kafka · 배치(Airflow + Spark) · 실시간(Flink) · HDFS · PostgreSQL" width="100%"/>
+</p>
+
+**데이터 흐름 (수집 → 화면)**
+
+1. **수집** — Airflow 수집기가 공공데이터 API에서 채권 스펙·시세를, 뉴스 크롤러가 60초 주기로 금융 뉴스를 가져와 Kafka에 발행 (`topic_bond_raw` / `topic_news_raw`)
+2. **배치 경로** — Spark Structured Streaming이 채권 토픽을 HDFS 원천 영역(`/raw/bonds/bas_dt=YYYYMMDD/`)에 Parquet으로 적재하고, 배치 잡이 중복을 제거해 가공 영역(`/dw/bonds/`)과 DB에 적재
+3. **실시간 경로** — Flink가 뉴스 토픽을 정규화해 DB Staging 테이블과 HDFS에 동시 적재(Dual-Sink)하고, DB 트리거가 최종 뉴스 테이블로 정규화
+4. **서빙** — PostgreSQL(Neon DB)이 최종 데이터를 제공하고, Logstash가 변경분을 Elasticsearch 검색 인덱스(`bonds_search`)로 동기화
+5. **표현 · 모니터링** — Django REST API와 Vue 화면이 사용자에게 제공하고, Prometheus·Grafana·Kibana가 지표와 검색 데이터를 관제
+
+> 처음에는 단일 배치로 처리했지만 병목과 뉴스 지연이 생겨, 무거운 연산이 필요한 정적 공시 데이터는 배치에, 지연이 곧 품질인 뉴스는 스트리밍에 맡기는 구조로 다시 설계했습니다.
+
+### ♻️ 라이브 데모 개편 (2026.08)
+
+전체 빅데이터 파이프라인은 무료 호스팅으로 상시 운영이 불가능해, **웹 레이어(Vue + Django + PostgreSQL)만 분리 배포**하고 파이프라인 산출물은 시드 데이터로 대체하는 데모 구성을 추가했습니다.
 
 ```text
 [Frontend]                [Backend API]              [Database]
@@ -21,18 +81,133 @@ frontend-pjt/dist         backend-pjt                  demo 스키마+시드
 | 분류 | 내용 |
 |---|---|
 | **배포 인프라** | 프로덕션 설정 추가(CORS·교차 사이트 쿠키·WhiteNoise·gunicorn·DATABASE_URL), Elasticsearch는 무료 호스팅이 없어 **설계되어 있던 Postgres ORM 폴백**으로 대체 |
-| **DB 부트스트랩** | Django 마이그레이션(0001, `id` PK)과 파이프라인 스키마(`bond_id` PK)의 불일치 문제를 해결하는 `bootstrap_demo` 커맨드 신설 — 모델 정의 기준 스키마 생성 + 선택적 fake migrate + 시드 적재를 한 번에 처리 ([deploy/](backend-pjt/deploy/)) |
+| **DB 부트스트랩** | Django 마이그레이션(0001, `id` PK)과 파이프라인 스키마(`bond_id` PK)의 불일치를 해결하는 `bootstrap_demo` 커맨드 신설 — 모델 정의 기준 스키마 생성 + 선택적 fake migrate + 시드 적재를 한 번에 처리 ([deploy/](backend-pjt/deploy/)) |
 | **버그 수정** | unmanaged 모델의 `db_column` 변경이 마이그레이션 상태에 누락되어 외부 앱 FK가 존재하지 않는 `bond(id)`를 참조하던 문제(0005 상태 정렬 마이그레이션), 챗봇 히스토리 전역 dict 무한 누적(LRU 캡 적용) |
 | **개선** | 뉴스 요약을 무거운 dspy 의존에서 **langchain-Gemini 직접 호출**로 교체(검증·교정 로직은 유지, 무료 호스팅 메모리 대응), `GOOGLE_API_KEY`로 잘못 안내되던 환경변수를 실제 코드가 읽는 `GEMINI_API_KEY`로 정정 |
 | **정리** | 미사용 mainpage 앱·dspy 전용 스크립트·Vite 스캐폴드 제거, API 명세 PDF는 docs/로 이동, requirements 경량화(dspy·elasticsearch·langchain 우산 패키지 제외) |
 
-**도커로 데모 스택 실행 (권장):**
+---
+
+## 🔀 배치 · 스트림 이원화 파이프라인
+
+같은 Kafka에서 출발하지만 두 경로는 처리 엔진·적재 방식·장애 대비가 다릅니다.
+
+| 구분 | 배치 경로 (채권 공시) | 실시간 경로 (뉴스) |
+|---|---|---|
+| **대상 데이터** | 채권 기본 정보 · 이자 지급 및 옵션 일정 · 일별 시세 · 금리 지표 | 네이버 금융 주요뉴스 · 연합인포맥스 채권 뉴스 |
+| **수집** | Airflow DAG 2개 — 채권 풀 파이프라인(매일 00시), ECOS/FRED 금리(매일 07시) | 크롤러가 60초 주기로 폴링해 신규 기사만 발행 |
+| **처리 엔진** | Spark (Structured Streaming + Batch) | PyFlink |
+| **적재** | HDFS `raw/` Parquet(snappy) → ISIN 기준 중복 제거 → `dw/` → DB Staging → `normalize_bonds_staging()` 프로시저로 정규화 | DB Staging(`news_article`) + HDFS JSON 동시 적재 → 트리거로 `news` · `news_provider` 정규화 |
+| **장애 대비** | Kafka 오프셋 + HDFS 체크포인트(`/spark/checkpoints/kafka_to_hdfs`)로 중단 지점부터 재처리 | Flink 체크포인트 + HDFS 원본 백업 |
+| **부가 처리** | 이자·옵션 상세는 실행당 최대 100건씩 점진 적재, API 장애 시 마스터 데이터로 일정 계산(Fallback), 30일 지난 HDFS 파티션 자동 삭제 | Flink는 고속 인서트만 맡고 중복 검사·정규화는 DB에 위임 |
+
+**채권 풀 파이프라인 DAG 순서:** `collect_api_to_kafka` → `spark_kafka_to_hdfs` → `spark_hdfs_to_postgres` → `ingest_option_cashflow_details` · `ingest_daily_market_data` → `verify_db_load` → `hdfs_cleanup_task`
+
+---
+
+## 📊 데이터 규모와 실측
+
+| 단계 | 결과 |
+|---|---|
+| **컨테이너 구성** | Docker 컨테이너 **20개**를 컴포즈 3개로 분리 운영 — 데이터 파이프라인 13 · 웹 서비스 5 · 모니터링 2 |
+| **배치 스케줄** | Airflow DAG **2개** — 채권 풀 파이프라인(매일 00시), ECOS/FRED 금리 수집(매일 07시) |
+| **실시간 수집** | 뉴스 크롤러 **60초 주기** 폴링 → Kafka 발행 |
+| **HDFS 적재** | 일일 채권 파티션 **약 19~28MB** Parquet(snappy), **30일** 보존 후 자동 삭제 |
+| **저장 공간** | 압축 포맷 적용과 메모리 내 중복 사전 필터링으로 **70% 절약** |
+| **관계형 DB** | 테이블 **17종** — 채권 마스터 · 현금흐름 · 옵션 · 시세, 뉴스 Staging/정규화, 용어 사전, 포트폴리오 |
+
+<p align="center">
+  <img src="images/ERD.png" alt="채권이지 관계형 DB ERD" width="100%"/>
+</p>
+
+---
+
+## 🛠️ 기술 스택
+
+| 영역 | 스택 |
+|---|---|
+| **프론트엔드** | <img src="https://img.shields.io/badge/Vue_3-4FC08D?style=flat-square&logo=vuedotjs&logoColor=white"/> <img src="https://img.shields.io/badge/Vite-646CFF?style=flat-square&logo=vite&logoColor=white"/> <img src="https://img.shields.io/badge/Pinia-FFD859?style=flat-square&logo=pinia&logoColor=black"/> |
+| **백엔드** | <img src="https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white"/> <img src="https://img.shields.io/badge/Django_5.2-092E20?style=flat-square&logo=django&logoColor=white"/> <img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white"/> <img src="https://img.shields.io/badge/Elasticsearch-005571?style=flat-square&logo=elasticsearch&logoColor=white"/> <img src="https://img.shields.io/badge/Logstash-005571?style=flat-square&logo=logstash&logoColor=white"/> |
+| **데이터 파이프라인** | <img src="https://img.shields.io/badge/Apache_Kafka-231F20?style=flat-square&logo=apachekafka&logoColor=white"/> <img src="https://img.shields.io/badge/Apache_Spark_3.5-E25A1C?style=flat-square&logo=apachespark&logoColor=white"/> <img src="https://img.shields.io/badge/Apache_Flink_1.20-E6526F?style=flat-square&logo=apacheflink&logoColor=white"/> <img src="https://img.shields.io/badge/Apache_Airflow-017CEE?style=flat-square&logo=apacheairflow&logoColor=white"/> <img src="https://img.shields.io/badge/Hadoop_HDFS-66CCFF?style=flat-square&logo=apachehadoop&logoColor=black"/> |
+| **AI** | <img src="https://img.shields.io/badge/Google_Gemini-8E75B2?style=flat-square&logo=googlegemini&logoColor=white"/> langchain-google-genai (챗봇 · 뉴스 요약) |
+| **인프라 · 모니터링** | <img src="https://img.shields.io/badge/Docker_Compose-2496ED?style=flat-square&logo=docker&logoColor=white"/> <img src="https://img.shields.io/badge/Prometheus-E6522C?style=flat-square&logo=prometheus&logoColor=white"/> <img src="https://img.shields.io/badge/Grafana-F46800?style=flat-square&logo=grafana&logoColor=white"/> <img src="https://img.shields.io/badge/Kibana-005571?style=flat-square&logo=kibana&logoColor=white"/> |
+| **데모 배포** | <img src="https://img.shields.io/badge/Cloudflare_Pages-F38020?style=flat-square&logo=cloudflarepages&logoColor=white"/> <img src="https://img.shields.io/badge/Render-000000?style=flat-square&logo=render&logoColor=white"/> Neon PostgreSQL |
+
+---
+
+## 💥 트러블 슈팅
+
+### 1. 단일 배치로는 뉴스가 늦게 도착했다
+* **현상:** 초기에는 모든 데이터를 하나의 배치로 처리해 병목이 생기고, 뉴스가 화면에 늦게 반영됨.
+* **원인:** 하루 한 번 갱신되는 공시 데이터와 수시로 들어오는 뉴스가 같은 경로·같은 주기를 공유.
+* **해결:** Kafka 토픽을 `topic_bond_raw` / `topic_news_raw`로 분리하고, 무거운 연산이 필요한 공시 데이터는 Airflow + Spark 배치에, 뉴스는 Flink 스트리밍에 맡기는 이원화 구조로 재설계.
+
+### 2. Flink 안의 무거운 동기 연산이 수집 속도를 막았다
+* **현상:** 스트림 처리 중 DB 조인과 중복 검사를 함께 수행하자 수집 속도가 떨어짐.
+* **원인:** 스트림 엔진이 레코드마다 DB를 조회하는 동기 연산을 떠안고 있었음.
+* **해결:** Flink는 Staging 테이블(`news_article`)에 고속 인서트만 하도록 역할을 줄이고, 정규화·중복 검증은 DB 트리거(`sync_news_article_to_erd`)에 위임. 압축 포맷과 메모리 내 중복 사전 필터링을 더해 저장 공간 70% 절약. ([상세 문서](docs/troubleshooting_staging_vs_normalized.md))
+
+### 3. 장애가 나면 어디까지 처리했는지 알 수 없었다
+* **현상:** 파이프라인이 중간에 멈추면 재시작 시 데이터가 유실되거나 중복 적재될 위험.
+* **해결:** Kafka 오프셋과 Spark Structured Streaming의 HDFS 체크포인트를 결합해 중단 지점부터 이어서 처리하도록 구성. 뉴스는 DB와 HDFS에 동시 적재(Dual-Sink)해 한쪽에 문제가 생겨도 원본이 남도록 함.
+
+### 4. 실시간 적재가 소형 파일을 쏟아냈다
+* **현상:** 실시간 적재로 HDFS에 작은 파일이 대량 생성되어 네임노드에 부하가 걸림.
+* **원인:** HDFS는 파일 개수만큼 네임노드가 메타데이터를 관리하므로 소형 파일이 많을수록 불리.
+* **해결:** 100MB 단위로 버퍼링한 뒤 병합해 쓰는 방식(Merge Write)으로 변경.
+
+### 5. 검색 인덱스 동기화가 매번 전체를 훑었다
+* **현상:** Logstash가 DB를 전체 조회하는 쿼리로 Elasticsearch를 동기화해 병목 발생.
+* **해결:** 채권과 연관 테이블의 `updated_at` 중 가장 최근 값을 추적 컬럼으로 삼아, 5분마다 변경분만 가져오는 증분 추출로 전환.
+
+---
+
+## 📂 디렉터리 구조
+
+```text
+Bond-EZ/
+├── backend-pjt/                   # Django REST API
+│   ├── apps/                      # 도메인 앱 — accounts·bonds·chat·glossary·indicators·news·portfolios·search·common
+│   ├── config/                    # Django 설정
+│   └── deploy/                    # 라이브 데모용 스키마·시드 SQL
+├── frontend-pjt/                  # Vue 3 + Vite 프론트엔드
+│   └── src/
+│       ├── api/                   # 백엔드 통신 래퍼·캐시 모듈
+│       ├── components/            # 공통 UI (내비게이션·플로팅 챗봇)
+│       └── pages/                 # 화면 단위 컴포넌트 (홈·시세·상세·비교·지표·뉴스·사전·가이드)
+├── data-pjt/                      # 데이터 파이프라인
+│   ├── airflow/dags/              # 채권 풀 파이프라인 DAG · 금리 수집 DAG · 세부 태스크
+│   ├── flink/                     # 실시간 뉴스 듀얼 싱크 적재 (PyFlink)
+│   ├── producer/                  # 뉴스 크롤러 · ECOS/FRED 금리 수집기
+│   ├── glossary/                  # 경제금융용어 PDF 파싱·적재
+│   ├── logstash/                  # DB → Elasticsearch 증분 동기화 파이프라인
+│   └── postgres/                  # DB 스키마 · 정규화 프로시저·트리거
+├── monitoring/                    # Prometheus · Grafana 설정
+├── docs/                          # 시작 가이드 · 운영 가이드 · 파이프라인 요약 · 챗봇 명세
+├── images/                        # 아키텍처 다이어그램 · ERD
+├── docker-compose.yml             # 웹 서비스 (Django · Vue · Elasticsearch · Kibana · Logstash)
+├── docker-compose-data.yml        # 데이터 파이프라인 (Kafka · Hadoop · Spark · Flink · Airflow)
+├── docker-compose-monitoring.yml  # 관제 (Prometheus · Grafana)
+├── docker-compose.demo.yml        # 웹 데모 스택 (Vue + Django + Postgres, 시드 자동 적재)
+└── service.sh · data.sh · monitoring.sh   # 영역별 구동 스크립트
+```
+
+---
+
+## 🚀 실행 방법
+
+**요구 사항:** Docker Desktop · (전체 파이프라인) 공공데이터포털 인증키 · (AI 기능) Gemini API 키
+
+**데모 스택 (권장)** — 프론트 · 백엔드 · PostgreSQL이 한 번에 뜨고 데모 시드(오늘 날짜 기준 시세 90일 시계열)가 자동 적재됩니다.
+
 ```bash
 docker compose -f docker-compose.demo.yml up --build
+# 프론트 http://localhost:5173 · 백엔드 API http://localhost:8000/api/v1
+# AI 챗봇·뉴스 요약까지 쓰려면 GEMINI_API_KEY=<키> 를 앞에 붙여 실행
 ```
-→ 프론트 http://localhost:5173 · 백엔드 API http://localhost:8000/api/v1 · PostgreSQL까지 한 번에 뜨고, 데모 시드(오늘 날짜 기준 시세 90일 시계열)가 자동 적재됩니다. AI 챗봇/뉴스 요약까지 쓰려면 `GEMINI_API_KEY=<키>`를 앞에 붙여 실행하세요. (루트의 `docker-compose.yml`은 ES/Kibana/Logstash를 포함한 원본 파이프라인 인프라용입니다.)
 
-**데모 백엔드 직접 실행:**
+**데모 백엔드 직접 실행**
+
 ```bash
 cd backend-pjt
 pip install -r requirements.txt
@@ -41,420 +216,33 @@ python manage.py bootstrap_demo    # 스키마 + 마이그레이션 + 시드 (�
 python manage.py runserver
 ```
 
----
+**전체 파이프라인**
 
-## 📌 목차 바로가기 (Quick Navigation)
-
-*   [🎈 1. 서비스 소개: 채권이지(BondEZ)](#section-1)
-*   [🏗️ 2. 계층별 데이터 아키텍처 (Data Architecture Layers)](#section-2)
-*   [📂 3. 프로젝트 디렉토리 및 HDFS 구조 (Directory & HDFS Structure)](#section-3)
-*   [🛠️ 4. 관계형 DB 테이블 명세 및 ERD](#section-4)
-*   [🚦 5. 신규 환경 복구 및 최초 실행 절차 (Setup & Run Guide)](#section-5)
-*   [🌐 6. REST API 명세 (API Specifications)](#section-6)
-*   [🌐 7. 서비스 포트 및 웹 콘솔 정보](#section-7)
-
----
-
-## <a id="section-1"></a>🌟 1. 서비스 소개: 채권이지(BondEZ)
-
-**채권이지(BondEZ)**는 기관 투자자에 비해 정보 접근성이 떨어지는 개인 투자자들을 위해, 인터넷 곳곳에 흩어져 있는 채권 데이터를 한데 모아 쉽고 편리하게 제공하는 **스마트 채권 & 뉴스 통합 정보 포털**입니다.
-
-### 💡 주요 핵심 기능
-* **💵 통합 채권 정보 조회**: 국채, 금융채, 회사채 등 시중의 다양한 채권 기본 스펙(표면금리, 만기일, 이자 주기 등)부터 이자 지급 현금흐름, 조기상환 옵션 일정까지 상세히 조회할 수 있습니다.
-* **📰 실시간 뉴스 및 AI 핵심 요약**: 채권 시장 및 거시경제에 영향을 미치는 주요 금융 뉴스들을 실시간으로 수집하고, LLM(Gemini) 모델을 연동하여 핵심 요약 내용을 바로 제공합니다.
-* **📈 거시경제 및 핵심 투자 지표**: 주요 국가의 기준금리, 만기별 국고채 금리, 장단기 금리차(10Y-3Y), 예금 금리 비교 데이터 및 신용등급별 평균 YTM 통계 데이터를 제공합니다.
-* **📚 금융 용어 사전**: 한국은행이 선정한 경제금융용어 800선을 기반으로 난이도별(입문, 기초, 중요, 심화) 및 카테고리별 전문 금융 용어를 쉽게 풀어서 해설합니다.
-* **💬 AI 투자 Q&A 챗봇**: 채권 지식이나 경제 지표, 포털 서비스 사용법에 관한 질문에 대화형 AI(Gemini API)가 실시간 데이터를 연동하여 직관적인 답변을 제공합니다.
-* **📂 가상 포트폴리오 및 즐겨찾기**: 관심 채권을 즐겨찾기 목록에 등록하거나, 가상으로 채권을 매입한 내역을 등록하여 본인만의 포트폴리오를 편리하게 관리하고 자산 추이를 모니터링할 수 있습니다.
-
----
-
-## <a id="section-2"></a>🏗️ 2. 계층별 데이터 아키텍처 (Data Architecture Layers)
-
-전체 시스템 아키텍처는 데이터 유통의 목적과 흐름에 따라 **7개의 독립된 계층(Layer)**으로 설계되었습니다.
-
-```mermaid
-graph TD
-    %% 1. Ingestion Layer
-    subgraph Ingestion_Layer [1. 수집 계층 - Ingestion]
-        collector[Airflow API Collector]
-        crawler[News Crawler]
-    end
-
-    %% 2. Buffering Layer
-    subgraph Buffering_Layer [2. 버퍼 계층 - Buffering]
-        kafka[Kafka Broker]
-    end
-
-    %% 3. Storage Layer
-    subgraph Storage_Layer [3. 저장소 계층 - Storage]
-        hdfs[(Hadoop HDFS)]
-    end
-
-    %% 4. Processing Layer
-    subgraph Processing_Layer [4. 분산 처리 계층 - Processing]
-        spark[Spark Streaming & Batch]
-        flink[PyFlink Stream Engine]
-    end
-
-    %% 5. Serving Layer
-    subgraph Serving_Layer [5. 데이터베이스 계층 - Serving]
-        db[(Neon DB PostgreSQL)]
-        es[(Elasticsearch)]
-    end
-
-    %% 6. Monitoring Layer
-    subgraph Monitoring_Layer [6. 모니터링 계층 - Monitoring]
-        prometheus[Prometheus]
-        grafana[Grafana]
-    end
-
-    %% 7. Presentation Layer
-    subgraph Presentation_Layer [7. 표현 및 시각화 계층 - Presentation]
-        backend[Django REST API]
-        frontend[Vue.js Frontend]
-        kibana[Kibana UI]
-    end
-
-    %% Flows
-    collector -->|Publish| kafka
-    crawler -->|Publish| kafka
-    
-    kafka -->|Subscribe| spark
-    kafka -->|Subscribe| flink
-
-    spark -->|Raw/DW Parquet| hdfs
-    flink -->|Raw JSON| hdfs
-    
-    spark -.->|Batch Load| db
-    flink -.->|Stream Sink| db
-    
-    db -.->|Logstash Sync| es
-    
-    backend -.->|SQL Query| db
-    backend -.->|NoSQL Query| es
-    frontend -.->|HTTP API| backend
-    kibana -.->|Visualize| es
-
-    prometheus -.->|Scrape metrics| backend
-    prometheus -.->|Scrape metrics| es
-    grafana -.->|Dashboard| prometheus
-```
-
-### 1) 수집 계층 (Ingestion Layer)
-* **구성**: `Airflow API Collector` (배치 수집), `News Crawler` (실시간 뉴스 스크래퍼)
-* **역할**: 외부 오픈 API(금융위원회 공공데이터) 및 금융 웹 뉴스 포털로부터 채권 스펙, 시세, 뉴스 원본 데이터를 수집하여 버퍼 계층으로 실시간 전송합니다.
-
-### 2) 버퍼 계층 (Buffering Layer)
-* **구성**: `Apache Kafka` (Zookeeper 연계)
-* **역할**: 대량의 유입 데이터 스트림을 순차 수신하는 완충망입니다. 장애 전파를 차단하고 이종 엔진(Spark, Flink)이 각자의 처리 속도에 맞춰 데이터를 구독(Subscribe)할 수 있도록 지원합니다.
-  * **핵심 토픽**: `topic_bond_raw` (채권 데이터), `topic_news_raw` (실시간 뉴스)
-
-### 3) 저장소 계층 (Storage Layer)
-* **구성**: `Hadoop HDFS` (NameNode & DataNode)
-* **역할**: 원천 및 가공 데이터를 수집 날짜별 폴더 구조(`/raw/bonds/bas_dt=YYYYMMDD/`, `/raw/news/`)로 안전하게 보관하는 대용량 분산 파일 스토리지입니다. 
-* **데이터 보존 정책 (Retention)**: 매일 실행되는 WebHDFS 클린업 테스크를 통해 30일이 지난 과거 파티션 폴더를 자동으로 영구 삭제하여 시스템 용량을 보존합니다.
-
-### 4) 분산 처리 및 가공 계층 (Processing Layer)
-* **구성**: `Apache Spark` (Streaming & Batch), `Apache Flink` (Stream Processor)
-* **역할**:
-  * **Spark**: Kafka의 스트림 데이터를 HDFS에 구조화 적재(Streaming)하고, 일 단위 벌크 데이터를 메모리상에서 중복 제거 및 가공(Batch)하여 가공 완료 영역(`dw/`)에 적재합니다.
-  * **Flink**: 실시간 뉴스 스트림을 처리하여 형식을 정규화하고 관계형 데이터베이스와 HDFS 파일 백업 저장소에 동시 적재(Dual-Sink)합니다.
-
-### 5) Serving 계층 (Serving/Database Layer)
-* **구성**: `Neon DB (PostgreSQL)`, `Elasticsearch`, `Logstash`
-* **역할**: 
-  * **Neon DB**: 사용자 포털에 최종적으로 가공된 정보를 제공하는 데이터웨어하우스 및 트랜잭션 DB입니다. 스테이징 테이블과 트리거/프로시저를 이용해 안전하게 데이터를 통합합니다.
-  * **Elasticsearch & Logstash**: Logstash를 이용해 Neon DB의 최종 채권 테이블 변경 데이터를 실시간 동기화하여 고속 검색 인덱스(`bonds_search`)를 구축하고 전문 검색 기능을 지원합니다.
-
-### 6) 모니터링 계층 (Monitoring Layer)
-* **구성**: `Prometheus`, `Grafana`
-* **역할**: 각 가동 컨테이너 서비스 및 호스트의 상태, 애플리케이션 지표(지연 시간, 리소스 사용량, TPS 등)를 수집하여 시각화함으로써 전체 시스템의 성능 및 동작 상태를 관제합니다.
-  * **Prometheus**: 실시간 메트릭 정보를 주기적으로 스크랩하여 저장합니다.
-  * **Grafana**: 시각적인 종합 감시 모니터링 대시보드를 사용자 및 개발자에게 실시간으로 제공합니다.
-
-### 7) 표현 및 시각화 계층 (Presentation & Visualization Layer)
-* **구성**: `Django API Backend`, `Vue.js Frontend`, `Kibana`
-* **역할**: 사용자가 모바일/웹 브라우저를 통해 포털을 이용할 수 있도록 프론트엔드 및 백엔드 REST API를 구현하였으며, Kibana를 통해 엘라스틱서치 검색 데이터를 모니터링 및 시각화합니다.
-
----
-
-## <a id="section-3"></a>📂 3. 프로젝트 디렉토리 및 HDFS 구조 (Directory & HDFS Structure)
-
-### 1) 프로젝트 디렉토리 트리 구조
-```text
-de_pjt/ (프로젝트 루트)
-├── backend-pjt/                    # Django 백엔드 프로젝트 폴더
-│   ├── apps/                       # 도메인별 백엔드 앱 (accounts, bonds, glossary, indicators, news 등)
-│   │   └── bonds/                  
-│   │       ├── models.py           # 채권 DB 모델 및 스키마 클래스
-│   │       ├── selectors.py        # 필터링 및 쿼리 비즈니스 로직 (has_price 등 필터 지원)
-│   │       └── serializers.py      # 클라이언트 응답용 데이터 포맷팅 및 정제 (NONE 평정 등)
-│   ├── config/                     # Django 설정 파일 폴더
-│   └── manage.py                   # Django 커맨드라인 유틸리티
-│
-├── frontend-pjt/                   # Vue.js 프론트엔드 프로젝트 폴더
-│   ├── src/
-│   │   ├── api/                    # 백엔드 통신 API 래퍼 및 캐시 모듈 (bonds.js, indicators.js 등)
-│   │   ├── components/             # 공통 UI 컴포넌트
-│   │   └── pages/                  # 화면 단위 Vue 컴포넌트 (market/MarketPage.vue, home/HomePage.vue 등)
-│   └── vite.config.js              # Vite 프론트엔드 빌드 및 프록시 설정
-│
-├── data-pjt/                       # 데이터 엔지니어링 파이프라인 폴더
-│   ├── airflow/                    # Apache Airflow 관련 설정 및 DAG 파일
-│   │   └── dags/                   
-│   │       ├── bond_full_pipeline_dag.py        # 채권 적재 파이프라인 전체 DAG 정의
-│   │       └── tasks/                           # 세부 실행 테스크 스크립트 (Spark/DB/HDFS 툴)
-│   ├── flink/                      # Apache Flink 스트리밍 처리 관련 소스코드
-│   │   └── news_processor.py       # 실시간 뉴스 듀얼 싱크 적재 스크립트
-│   ├── postgres/                   
-│   │   └── init.sql                # DB 스키마 생성 및 normalize_bonds_staging() 프로시저
-│   ├── producer/                   
-│   │   ├── interest_rate_loader.py # ECOS/FRED 금리 API 수집기
-│   │   └── news_crawler.py         # 실시간 뉴스 크롤러 프로듀서
-│   └── requirements.txt            # 파이프라인 가동 패키지 정의
-│
-├── monitoring/                     # 관제 시스템(Prometheus, Grafana) 설정 파일 폴더
-│
-├── docs/                           # 프로젝트 문서 (GETTING_STARTED, OPERATIONS_GUIDE, 기획서, API 명세 PDF 등)
-│
-├── .env.example                    # 프로젝트 배포 시 복사하여 사용할 환경 설정 템플릿
-├── docker-compose.yml              # 애플리케이션 서비스용 도커 컴포즈 파일 (Web/Search)
-├── docker-compose.demo.yml         # 웹 데모 스택 (Vue+Django+Postgres, 시드 자동 적재)
-├── docker-compose-data.yml         # 데이터 파이프라인용 도커 컴포즈 파일 (Kafka/Hadoop/Spark/Airflow)
-├── docker-compose-monitoring.yml    # 관제용 도커 컴포즈 파일 (Grafana/Prometheus)
-│
-├── service.sh                      # 웹 서비스 구동 및 Django 마이그레이션 자동화 쉘 스크립트
-├── data.sh                         # 데이터 파이프라인 인프라 구동 및 HDFS 초기화 쉘 스크립트
-└── monitoring.sh                   # 관제 서비스 구동 쉘 스크립트
-```
-
-### 2) HDFS 디렉토리 및 파일 구조
-HDFS 분산 스토리지 내에 저장되는 원천/가공 데이터와 Spark 메타데이터의 물리적 구조입니다.
-```text
-HDFS Root (/)
-├── raw/                        # 1. 수집 원천 데이터 영역
-│   ├── bonds/                  # 채권 API 원본 데이터 (Parquet 포맷)
-│   │   ├── _spark_metadata/    # Spark Structured Streaming 파일 상태 메타데이터
-│   │   ├── bas_dt=20260621/    # 6월 21일 수집 채권 데이터 파티션 폴더
-│   │   │   └── part-...snappy.parquet (~18.9MB)
-│   │   └── bas_dt=20260622/    # 6월 22일 수집 채권 데이터 파티션 폴더
-│   │       └── part-...snappy.parquet (~28.4MB)
-│   │
-│   └── news/                   # 실시간 수집 뉴스 원본 데이터 (JSON 포맷)
-│       └── bas_dt=20260622/    # Flink가 write_date에서 동적 추출한 오늘 자 뉴스 파티션
-│           └── .part-...inprogress... (실시간 유입 중인 데이터 쓰기 세션 파일)
-│
-├── dw/                         # 2. 데이터 웨어하우스 (가공 및 적재용) 영역
-│   └── bonds/                  # 중복 제거 및 가공 완료된 테이블 데이터
-│       ├── _SUCCESS            # 배치 처리 최종 성공 플래그 파일
-│       └── bas_dt=20260622/    # 6월 22일 배치 처리된 정규화 데이터 파티션
-│           └── part-...snappy.parquet
-│
-└── spark/                      # 3. Spark 시스템 메타데이터 영역
-    └── checkpoints/            # Spark 스트리밍 유실 방지용 체크포인트
-        └── kafka_to_hdfs/      # Kafka-to-HDFS 파이프라인의 오프셋 및 오프셋 커밋 정보
-```
-
----
-
-## <a id="section-4"></a>🛠️ 4. 관계형 DB 테이블 명세 및 ERD
-
-데이터베이스에 적재 완료된 관계형 테이블 구조 및 설계 다이어그램(ERD) 정보입니다.
-
-### 1) 관계형 데이터베이스 ERD 다이어그램
-![관계형 DB ERD 다이어그램](./images/ERD.png)
-
-### 2) 테이블 상세 명세
-현재 데이터베이스(`bonds_db`) 내의 모든 관계형 테이블은 **소문자 및 스네이크 케이스(Snake Case)** 명명 규칙을 적용하여 적재됩니다.
-
-| 영역 | 테이블명 | 용도 및 설명 |
-| :---: | :--- | :--- |
-| **채권 기본 정보** | `bond` | 수집 완료된 최종 채권 마스터 정보 (국제표준코드 ISIN 기준 Unique) |
-| | `industry` | 발행사(기업 및 금융기관)가 속한 표준 산업 분류 |
-| | `issuer` | 채권 발행기관 마스터 정보 (법인등록번호 CRNO 매핑) |
-| | `bond_type` | 채권 종류 코드 시드 (국채, 회사채, 금융채 등) |
-| | `seniority` | 채권 변제 우선순위 구분 (선순위, 후순위) |
-| | `credit_rating` | 채권 신용평가 등급 코드 시드 (AAA ~ D, NONE) |
-| | `guarantee_status` | 채권 상환 보증 여부 (보증, 무보증) |
-| **채권 상약/시세** | `bond_cashflow_rule` | 채권별 상세 이자 지급 일정 및 계산 공식 규격 |
-| | `bond_option_exercise` | 채권 조기상환권(콜/풋 옵션) 상세 행사 기간 정보 |
-| | `bond_market_data` | 일별 장내/장외 고시 종가 시세 및 만기수익률(YTM), 듀레이션 |
-| **사용자 포트폴리오** | `users` | 사용자 계정 데이터 |
-| | `user_bond` | 사용자의 가상 채권 매수 및 포트폴리오 관리 정보 |
-| **뉴스 정보** | `news_provider` | 뉴스 수집 언론사 목록 |
-| | `news` | 트리거로 정규화 적재된 최종 뉴스 기사 데이터 |
-| | `news_article` | Flink가 실시간으로 수집 뉴스를 밀어 넣는 Staging 테이블 |
-| **용어 사전** | `glossary_category` | 금융 용어 사전 카테고리 |
-| | `glossary` | 한국은행 경제금융용어 800선 원문 파싱 및 난이도 정제 데이터 |
-
----
-
-## <a id="section-5"></a>🚦 5. 신규 환경 복구 및 최초 실행 절차 (Setup & Run Guide)
-
-프로젝트 소스 파일(압축 파일 등)을 최초 전달받아 신규 로컬 환경에서 전체 서비스를 빌드하고 데이터 수집까지 완료하는 **단계별 Step-by-Step 절차**입니다.
-
-### [Step 1] 사전 요구사항 확인 및 Docker 구동
-1. 작업 컴퓨터에 **Docker Desktop**이 설치되어 있고 실행 중인지 확인합니다.
-2. 실행할 터미널(Git Bash, WSL, Terminal 등)을 프로젝트 루트 디렉토리(`de_pjt/`)에서 엽니다.
-
-### [Step 2] 환경 변수(.env) 설정 파일 작성
-프로젝트 루트 폴더에 `.env` 파일을 복사하여 생성하고 필요한 API Key 설정을 입력합니다.
 ```bash
-# 1. 템플릿 파일을 복사하여 .env 생성
-cp .env.example .env
+cp .env.example .env     # DATA_PORTAL_API_KEY · GEMINI_API_KEY · DB 접속 정보 입력
+sh service.sh up         # 웹 서비스 — Elasticsearch·Kibana 기동 → Django 마이그레이션 (최초 2~3분)
+sh data.sh up            # 파이프라인 — Kafka·HDFS·Spark·Flink·Airflow 기동 → HDFS 초기화 → 용어 사전 적재
+sh monitoring.sh up      # 관제 — Prometheus·Grafana (선택)
 ```
-2. 생성된 `.env` 파일을 텍스트 에디터로 열어 **오픈 API 인증키**와 **Gemini API 키**를 확인 후 입력합니다.
-   * `DATA_PORTAL_API_KEY`: 공공데이터포털(data.go.kr) 서비스 인증키
-   * `GEMINI_API_KEY`: AI 챗봇 및 뉴스 요약용 API 키
-   * `DB_HOST`, `POSTGRES_DB` 등 Neon DB 접속 정보 확인
 
-### [Step 3] 가상 네트워크 및 웹 서비스 구동
-1. 공통 웹 서비스 영역과 백엔드를 빌드하고 실행합니다.
-```bash
-sh service.sh up
-```
-* **동작 내용**: 이미지 빌드 ➔ Elasticsearch/Kibana 기동 ➔ Django 백엔드가 실행될 때까지 대기 ➔ 데이터베이스 마이그레이션 적용 및 서비스 개시.
-* **대기 시간**: 약 2~3분 소요 (최초 빌드 시).
-
-### [Step 4] 데이터 파이프라인 구동 및 기초 데이터 로드
-2. 다른 터미널 창을 열어 데이터 수집 및 가공 파이프라인을 실행합니다.
-```bash
-sh data.sh up
-```
-* **동작 내용**: 공통 Kafka, HDFS, Spark, Flink 및 Airflow 기동 ➔ HDFS 파일 시스템 디렉토리 생성 및 초기화 ➔ 경제 용어 데이터베이스(`glossary`) 자동 적재.
-* **대기 시간**: 약 1~2분 소요.
-
-### [Step 5] Airflow 스케줄러를 이용한 최초 데이터 적재
-데이터 수집 및 적재는 Airflow의 DAG(작업 흐름)에 의해 체계적으로 제어됩니다. 최초 구동 시에는 수동으로 작업을 한 번 실행하여 채권 전체 데이터베이스를 채워줍니다.
-
-1. 웹 브라우저를 열고 Airflow 관리자 콘솔 주소인 [http://localhost:8081](http://localhost:8081)에 접속합니다.
-2. 로그인 창이 나타나면 아래 기본 계정으로 로그인합니다.
-   * **ID**: `admin`
-   * **Password**: `admin`
-3. DAG 목록 화면에서 **`bond_full_pipeline_dag`**를 찾습니다.
-4. 왼쪽 토글 스위치를 눌러 DAG 상태를 **`Active`**로 켭니다.
-5. 우측 플레이 버튼(▷)을 클릭하고 **`Trigger DAG`**를 눌러 채권 배치 수집 및 적재 파이프라인을 최초로 작동시킵니다.
-6. **검증**: 약 2~3분 뒤 작업이 모두 초록색(`Success`)으로 완료되면 데이터베이스 적재가 성공한 것입니다.
-
-> [!IMPORTANT]
-> **[참고 사항: 적재 검증용 SQL 가이드]**
-> 최초 적재가 완료된 후, 로컬 PostgreSQL 컨테이너에 접속하거나 데이터베이스 연결 툴을 사용하여 데이터가 정상적으로 들어왔는지 검증할 수 있는 대표적인 쿼리 모음입니다.
-> 
-> **1. PostgreSQL 데이터베이스 CLI(psql) 콘솔 접속 명령어:**
-> ```bash
-> docker exec -it postgres psql -U ${POSTGRES_USER} -d ${POSTGRES_DB}
-> ```
-> 
-> **2. 전체 테이블 데이터 건수 통합 요약 검증:**
-> ```sql
-> SELECT
->     (SELECT COUNT(*) FROM bond) AS bond_count,
->     (SELECT COUNT(*) FROM bond_cashflow_rule) AS cashflow_rule_count,
->     (SELECT COUNT(*) FROM bond_option_exercise) AS option_exercise_count,
->     (SELECT COUNT(*) FROM bond_market_data) AS market_data_count,
->     (SELECT COUNT(*) FROM news) AS news_count,
->     (SELECT COUNT(*) FROM glossary) AS glossary_count,
->     (SELECT COUNT(*) FROM issuer) AS issuer_count,
->     (SELECT COUNT(*) FROM industry) AS industry_count;
-> ```
-> 
-> **3. 최초 이자지급일(Coupon) 데이터 연동 검증:**
-> ```sql
-> SELECT b.isin_code, b.bond_name, c.interest_payment_method, c.first_interest_payment_date, c.interest_payment_unit_months
-> FROM bond b
-> JOIN bond_cashflow_rule c ON b.cashflow_rule_id = c.cashflow_rule_id
-> WHERE c.first_interest_payment_date IS NOT NULL
-> LIMIT 5;
-> ```
-> 
-> **4. 조기상환 옵션 권리 행사일 데이터 연동 검증:**
-> ```sql
-> SELECT b.isin_code, b.bond_name, b.option_type, o.exercise_start_date_1, o.exercise_end_date_1, o.exercise_reason
-> FROM bond b
-> JOIN bond_option_exercise o ON b.option_exercise_id = o.option_exercise_id
-> WHERE o.exercise_start_date_1 IS NOT NULL AND b.option_type != '옵션해당사항없음'
-> LIMIT 5;
-> ```
-
-### [Step 6] 최종 구동 서비스 접속 및 확인
-파이프라인 최초 기동이 완료되면, 아래 주소들에 접속하여 정상 작동 여부를 확인합니다.
-* **Vue 웹 화면**: [http://localhost:5173](http://localhost:5173) (메인 대시보드 및 채권 시세 탭에서 정상적으로 목록이 로드되는지 확인)
-* **Kibana UI**: [http://localhost:5601](http://localhost:5601) (Elasticsearch 인덱싱 상태 확인)
+최초 적재는 Airflow 콘솔(http://localhost:8081, 로컬 기본 계정 `admin` / `admin`)에서 `bond_full_pipeline_dag`를 켜고 한 번 수동 실행합니다. 단계별 절차와 적재 검증 SQL, 서비스별 포트는 [운영 가이드](docs/OPERATIONS_GUIDE.md)에 있습니다.
 
 ---
 
-## <a id="section-6"></a>🌐 6. REST API 명세 (API Specifications)
+## 📚 문서
 
-모든 API 호출은 공통 프리픽스로 `/api/v1`을 가집니다. (예: `/api/v1/bonds`)
-인증은 **Django Session 기반 쿠키 인증**을 적용합니다.
+| 문서 | 내용 |
+|---|---|
+| [GETTING_STARTED.md](docs/GETTING_STARTED.md) | 사전 요구사항 · 영역별 구동 스크립트 · 문제 해결 Q&A |
+| [OPERATIONS_GUIDE.md](docs/OPERATIONS_GUIDE.md) | 계층별 아키텍처 · HDFS 구조 · DB 테이블 명세 · REST API 명세 · 서비스 포트 |
+| [pipeline_ingestion_summary.md](docs/pipeline_ingestion_summary.md) | 데이터 출처 · 오픈 API 명세 · 파이프라인 구현 세부 |
+| [troubleshooting_staging_vs_normalized.md](docs/troubleshooting_staging_vs_normalized.md) | HDFS와 DB의 역할 분담 · Staging과 정규화 테이블을 나눈 이유 |
+| [chatbot_chain_spec.md](docs/chatbot_chain_spec.md) · [chatbot_internal_logic.md](docs/chatbot_internal_logic.md) | AI 챗봇 처리 체인 · 내부 로직 |
+| [project_plan.md](docs/project_plan.md) | 프로젝트 기획서 |
 
-### 1) 회원 및 인증 (`accounts` 앱)
-* `POST /auth/signup` (별칭: `/auth/register`) : 사용자 회원가입
-* `POST /auth/login` : 로그인
-* `POST /auth/logout` : 로그아웃 (인증 필요)
-* `GET /auth/me` (별칭: `/me`) : 내 프로필 정보 조회 (인증 필요)
-* `PATCH /auth/me` (별칭: `/me`) : 내 프로필 정보 수정 (인증 필요)
-* `DELETE /auth/me` (별칭: `/me`) : 회원 탈퇴 (인증 필요)
+## 데이터 출처
 
-### 2) 채권 정보 조회 및 분석 (`bonds` 앱)
-* `GET /bonds` : 전체 채권 리스트 조회 (서버사이드 페이징, 키워드/필터/정렬 지원)
-* `GET /bonds/curated` : 사용자 맞춤형 추천 채권 리스트 반환
-* `GET /bonds/compare` : 2개의 채권 ID를 파라미터(`ids=1,2`)로 받아 상세 비교 분석 데이터 생성
-* `GET /bonds/filter-options` : 프론트엔드 검색 필터 바인딩용 메타 목록 조회
-* `GET /bonds/{bond_id}` : 특정 채권 상세 정보 조회 (규칙 기반 요약 및 관련 용어 목록 포함)
-* `GET /bonds/{bond_id}/cashflows` : 특정 채권의 미래 이자 지급 스케줄(현금흐름) 조건 조회
-* `GET /bonds/{bond_id}/market-data` : 특정 채권의 일별 과거 시장 가격(시세) 히스토리 조회 (`from`/`to` 조회 기간 설정)
-* `GET /bonds/{bond_id}/market-data/latest` : 특정 채권의 최신 시장 시세 데이터 조회
-
-### 3) 채권 검색 (`search` 앱)
-* `GET /search/bonds` : Elasticsearch 기반 채권 전문 검색 (불가 시 DB fallback 검색 수행)
-
-### 4) 뉴스 기사 및 AI 요약 (`news` 앱)
-* `GET /news` : 채권 및 거시경제 뉴스 기사 목록 조회
-* `GET /news/providers` : 뉴스 수집 언론사 목록 조회
-* `GET /news/{news_id}` : 특정 뉴스 기사 상세 본문 조회
-* `POST /news/summarize` : 뉴스 텍스트를 LLM(Gemini)에 전달해 요약 (기존 뉴스 ID 지정 시 캐시 사용 가능)
-* `POST /news/{news_id}/summarize` : 뉴스 ID 기반 LLM 요약 결과 반환
-
-### 5) 거시경제 및 투자 지표 (`indicators` 앱)
-* `GET /indicators` : 제공하는 전체 투자 지표 목록 조회
-* `GET /base-rates` : 주요 국가별 중앙은행 기준금리 현황 조회
-* `GET /base-rates/treasury-rates` : 주요 국가별 국고채/미국채 만기별(3Y, 10Y) 금리 조회
-* `GET /base-rates/yield-spreads` : 주요 국가별 10Y-3Y 장단기 금리차 현황 조회
-* `GET /base-rates/yield-curve` : 주요 국가별 만기 수익률 곡선(Yield Curve) 포인트 데이터 조회
-* `GET /deposit-rates` : 국내 1금융권 정기 예금 금리 비교 데이터 조회
-* `GET /credit-ratings/rates` : 채권 신용등급별 평균 만기수익률(YTM) 및 발행 수 통계 조회
-
-### 6) 금융 용어 사전 (`glossary` 앱)
-* `GET /glossary` : 한국은행 경제금융용어 800선 검색 리스트 (난이도/카테고리 필터링 제공)
-* `GET /glossary/categories` : 용어 카테고리 분류 정보 조회
-* `GET /glossary/{term_id}` : 특정 금융 용어 상세 설명 및 예문 조회
-
-### 7) 포트폴리오 및 관심 채권 (`portfolios` 앱)
-* `GET /me/bonds` : 내 가상 포트폴리오 채권 보유 목록 조회 (인증 필요)
-* `POST /me/bonds` : 내 가상 포트폴리오에 채권 매입 내역 추가/수정 (인증 필요)
-* `DELETE /me/bonds/{user_bond_id}` : 가상 채권 매수 항목 삭제 (인증 필요)
-* `GET /me/favorites` : 관심 채권(즐겨찾기) 리스트 조회 (인증 필요)
-* `POST /me/favorites` : 관심 채권 즐겨찾기 등록 (인증 필요)
-* `DELETE /me/favorites/{bond_id}` : 관심 채권 즐겨찾기 해제 (인증 필요)
-
-### 8) 메인 화면 및 AI 대화 서비스 (`chat` / `main` 앱)
-* `GET /main` : 메인 요약 정보 조회 (인기 검색어, 대표 지표, 추천 채권, 뉴스 등 통합)
-* `POST /chat` : 채권 Q&A 채팅 수행 (대화 세션 ID 기반 Gemini 응답)
-
----
-
-## <a id="section-7"></a>🌐 7. 서비스 포트 및 웹 콘솔 정보
-
-| 분류 | 서비스명 | 접속 주소 (URL) | 비고 |
-|:---:|:---|:---|:---|
-| **애플리케이션** | Vue Frontend | [http://localhost:5173](http://localhost:5173) | 채권 포털 웹 UI |
-| | Django API | [http://localhost:8000](http://localhost:8000) | 백엔드 REST API |
-| **모니터링** | Kibana UI | [http://localhost:5601](http://localhost:5601) | 검색 데이터 시각화 |
-| | Grafana UI | [http://localhost:3000](http://localhost:3000) | 메트릭 시각화 대시보드 |
-| | Prometheus | [http://localhost:9090](http://localhost:9090) | 시스템 메트릭 조회 |
-| **파이프라인** | Airflow Web | [http://localhost:8081](http://localhost:8081) | 배치 스케줄러 (ID: `admin` / `admin`) |
-| | Spark Master | [http://localhost:8080](http://localhost:8080) | Spark 분산 처리 관리 콘솔 |
-| | Flink UI | [http://localhost:8082](http://localhost:8082) | Flink 실시간 스트림 관리 콘솔 |
-| | Hadoop HDFS | [http://localhost:9870](http://localhost:9870) | 분산 스토리지 탐색 웹 콘솔 |
+- [공공데이터포털](https://www.data.go.kr) (금융위원회) — 채권기본정보 · 채권권리일정정보 · 채권권리행사정보 · 채권시세정보, 한국예탁결제원 채권정보서비스(장애 대비 백업)
+- 금리 지표 — 한국은행 ECOS · FRED
+- 뉴스 — [네이버 금융 주요뉴스](https://finance.naver.com/news/mainnews.naver) · [연합인포맥스](https://news.einfomax.co.kr)
+- 용어 사전 — 한국은행 「경제금융용어 800선」
