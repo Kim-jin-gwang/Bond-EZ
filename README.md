@@ -1,38 +1,39 @@
-# 💵 채권이지 (Bond-EZ)
+<div align="center">
+  <h1>채권이지 (Bond-EZ)</h1>
+  <h3>개인 투자자를 위한 채권 통합 정보 포털</h3>
+  <p>흩어진 채권 정보를 한곳에 모아 보여줍니다.</p>
+  <p>
+    <strong>팀</strong> 3인 팀 프로젝트<br />
+    <strong>개발 기간</strong> 2026.05 ~ 2026.06<br />
+    <strong>플랫폼</strong> Web (Vue 3 + Django REST API) · Kafka · Spark · Flink · Airflow · HDFS 데이터 파이프라인
+  </p>
+  <p><a href="https://bond-ez.pages.dev">bond-ez.pages.dev</a> — 회원가입 없이 둘러볼 수 있고, 가입하면 즐겨찾기·맞춤 추천까지 체험 가능 (무료 백엔드 서버라 첫 접속 시 데이터 로딩에 최대 1분)</p>
+</div>
 
-> **흩어진 채권 정보를 한곳에 모아 보여줍니다.**
->
-> **Project Date:** 2026.05 ~ 2026.06 · **3인 팀 프로젝트**
->
-> **Platform:** Web (Vue 3 + Django REST API) · Kafka · Spark · Flink · Airflow · HDFS 데이터 파이프라인
->
-> **Role:** 데이터 엔지니어링 및 백엔드 아키텍처 리딩
->
-> **Live Demo:** [bond-ez.pages.dev](https://bond-ez.pages.dev) — 회원가입 없이 둘러볼 수 있고, 가입하면 즐겨찾기·맞춤 추천까지 체험 가능 (무료 백엔드 서버라 첫 접속 시 데이터 로딩에 최대 1분)
+---
+
+## 📑 목차
+
+- [서비스 소개](#service-introduction)
+- [팀원 소개](#team)
+- [주요 기능](#features)
+- [기술 스택](#technology-stack)
+- [시스템 아키텍처](#system-architecture)
+- [ERD](#erd)
+- [핵심 기술](#technology-details)
+- [개발자 가이드](#getting-started)
+- [디렉터리 구조](#directory-structure)
+- [프로젝트 문서와 협업 규칙](#project-guide)
+
+---
+
+<a id="service-introduction"></a>
+
+## 💡 서비스 소개
 
 개인 투자자에게 필요한 **채권 기본 정보, 이자 지급 일정, 신용등급, 실시간 관련 뉴스, 금융 용어 사전**을 자동으로 수집·가공해 한 화면에서 보여주는 채권 통합 정보 포털입니다.
 
 매일 갱신되는 공시 데이터는 **배치(Airflow + Spark)** 로, 뉴스는 **실시간 스트리밍(Flink)** 으로 나눠 처리하고, 두 경로를 Kafka와 HDFS로 묶어 **장애가 나도 중단 지점부터 다시 처리하는** 데이터 파이프라인이 프로젝트의 본체입니다.
-
----
-
-## 📱 실제 화면
-
-| 홈 | 채권 시세 | 투자 지표 |
-|:---:|:---:|:---:|
-| <img src="docs/images/screenshots/01-home.png" width="300" alt="홈 화면"/> | <img src="docs/images/screenshots/02-bond-list.png" width="300" alt="채권 시세 목록"/> | <img src="docs/images/screenshots/03-indicators.png" width="300" alt="투자 지표 화면"/> |
-| 조건 검색과 투자 판단 지표로 들어가는 첫 화면 | 종목명·발행기관으로 검색하고 수익률·만기를 한 표에서 비교 | 나라별 금리, 장단기 금리차, Yield Curve를 표와 그래프로 확인 |
-
-| 금리 뉴스 | 용어 사전 | 채권 가이드 |
-|:---:|:---:|:---:|
-| <img src="docs/images/screenshots/04-news.png" width="300" alt="금리 뉴스 화면"/> | <img src="docs/images/screenshots/05-dictionary.png" width="300" alt="채권 용어 사전"/> | <img src="docs/images/screenshots/06-guide.png" width="300" alt="채권 가이드"/> |
-| 금리·채권 뉴스를 모아 보고 AI 요약으로 확인 | 채권 용어를 분류별로 찾아 쉬운 설명과 예시로 확인 | 채권의 기본 개념과 투자 위험을 단계별로 안내 |
-
-> 화면은 [라이브 데모](https://bond-ez.pages.dev)에서 찍은 것입니다.
-
----
-
-## 📖 프로젝트 개요
 
 채권 정보는 공시 사이트·증권사·뉴스 포털에 흩어져 있어, 기관 투자자에 비해 개인 투자자는 한 종목을 살펴보는 데도 여러 사이트를 오가야 합니다.
 채권이지는 그 공백을 **공공데이터 + 뉴스 크롤링 + 분산 데이터 파이프라인**으로 채웁니다.
@@ -41,7 +42,61 @@
 * **매일 자동 갱신** — 공시 데이터는 매일 00시, 금리 지표는 매일 07시에 Airflow가 수집·적재
 * **쉬운 설명** — 뉴스는 LLM(Gemini)이 요약하고, 낯선 용어는 한국은행 경제금융용어 800선 기반 사전으로 풀이
 
-### 💡 주요 기능
+---
+
+<a id="team"></a>
+
+## 👥 팀원 소개
+
+<div align="center">
+<table align="center">
+  <tr>
+    <td align="center"><strong>김진광</strong><br />데이터 엔지니어링 및 백엔드 아키텍처 리딩</td>
+  </tr>
+</table>
+</div>
+
+---
+
+<a id="features"></a>
+
+## ✨ 주요 기능
+
+<table width="100%">
+  <thead>
+    <tr><th width="56%">화면</th><th width="44%">설명</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td width="56%"><a href="docs/images/screenshots/01-home.png"><img src="docs/images/screenshots/01-home.png" alt="홈 화면" width="100%" /></a></td>
+      <td width="44%" valign="middle"><strong>홈</strong><br /><br />조건 검색과 투자 판단 지표로 들어가는 첫 화면</td>
+    </tr>
+    <tr>
+      <td width="56%"><a href="docs/images/screenshots/02-bond-list.png"><img src="docs/images/screenshots/02-bond-list.png" alt="채권 시세 목록" width="100%" /></a></td>
+      <td width="44%" valign="middle"><strong>채권 시세</strong><br /><br />종목명·발행기관으로 검색하고 수익률·만기를 한 표에서 비교</td>
+    </tr>
+    <tr>
+      <td width="56%"><a href="docs/images/screenshots/03-indicators.png"><img src="docs/images/screenshots/03-indicators.png" alt="투자 지표 화면" width="100%" /></a></td>
+      <td width="44%" valign="middle"><strong>투자 지표</strong><br /><br />나라별 금리, 장단기 금리차, Yield Curve를 표와 그래프로 확인</td>
+    </tr>
+    <tr>
+      <td width="56%"><a href="docs/images/screenshots/04-news.png"><img src="docs/images/screenshots/04-news.png" alt="금리 뉴스 화면" width="100%" /></a></td>
+      <td width="44%" valign="middle"><strong>금리 뉴스</strong><br /><br />금리·채권 뉴스를 모아 보고 AI 요약으로 확인</td>
+    </tr>
+    <tr>
+      <td width="56%"><a href="docs/images/screenshots/05-dictionary.png"><img src="docs/images/screenshots/05-dictionary.png" alt="채권 용어 사전" width="100%" /></a></td>
+      <td width="44%" valign="middle"><strong>용어 사전</strong><br /><br />채권 용어를 분류별로 찾아 쉬운 설명과 예시로 확인</td>
+    </tr>
+    <tr>
+      <td width="56%"><a href="docs/images/screenshots/06-guide.png"><img src="docs/images/screenshots/06-guide.png" alt="채권 가이드" width="100%" /></a></td>
+      <td width="44%" valign="middle"><strong>채권 가이드</strong><br /><br />채권의 기본 개념과 투자 위험을 단계별로 안내</td>
+    </tr>
+  </tbody>
+</table>
+
+> 화면은 [라이브 데모](https://bond-ez.pages.dev)에서 찍은 것입니다.
+
+### 기능 목록
 
 | 기능 | 설명 |
 |---|---|
@@ -54,7 +109,26 @@
 
 ---
 
-## 🏗️ 아키텍처 — 7계층 데이터 파이프라인
+<a id="technology-stack"></a>
+
+## 🛠️ 기술 스택
+
+| 영역 | 스택 |
+|---|---|
+| **프론트엔드** | <img src="https://img.shields.io/badge/Vue_3-4FC08D?style=flat-square&logo=vuedotjs&logoColor=white"/> <img src="https://img.shields.io/badge/Vite-646CFF?style=flat-square&logo=vite&logoColor=white"/> <img src="https://img.shields.io/badge/Pinia-FFD859?style=flat-square&logo=pinia&logoColor=black"/> |
+| **백엔드** | <img src="https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white"/> <img src="https://img.shields.io/badge/Django_5.2-092E20?style=flat-square&logo=django&logoColor=white"/> <img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white"/> <img src="https://img.shields.io/badge/Elasticsearch-005571?style=flat-square&logo=elasticsearch&logoColor=white"/> <img src="https://img.shields.io/badge/Logstash-005571?style=flat-square&logo=logstash&logoColor=white"/> |
+| **데이터 파이프라인** | <img src="https://img.shields.io/badge/Apache_Kafka-231F20?style=flat-square&logo=apachekafka&logoColor=white"/> <img src="https://img.shields.io/badge/Apache_Spark_3.5-E25A1C?style=flat-square&logo=apachespark&logoColor=white"/> <img src="https://img.shields.io/badge/Apache_Flink_1.20-E6526F?style=flat-square&logo=apacheflink&logoColor=white"/> <img src="https://img.shields.io/badge/Apache_Airflow-017CEE?style=flat-square&logo=apacheairflow&logoColor=white"/> <img src="https://img.shields.io/badge/Hadoop_HDFS-66CCFF?style=flat-square&logo=apachehadoop&logoColor=black"/> |
+| **AI** | <img src="https://img.shields.io/badge/Google_Gemini-8E75B2?style=flat-square&logo=googlegemini&logoColor=white"/> langchain-google-genai (챗봇 · 뉴스 요약) |
+| **인프라 · 모니터링** | <img src="https://img.shields.io/badge/Docker_Compose-2496ED?style=flat-square&logo=docker&logoColor=white"/> <img src="https://img.shields.io/badge/Prometheus-E6522C?style=flat-square&logo=prometheus&logoColor=white"/> <img src="https://img.shields.io/badge/Grafana-F46800?style=flat-square&logo=grafana&logoColor=white"/> <img src="https://img.shields.io/badge/Kibana-005571?style=flat-square&logo=kibana&logoColor=white"/> |
+| **데모 배포** | <img src="https://img.shields.io/badge/Cloudflare_Pages-F38020?style=flat-square&logo=cloudflarepages&logoColor=white"/> <img src="https://img.shields.io/badge/Render-000000?style=flat-square&logo=render&logoColor=white"/> Neon PostgreSQL |
+
+---
+
+<a id="system-architecture"></a>
+
+## 🏗️ 시스템 아키텍처
+
+### 서비스 구성
 
 공시 데이터와 뉴스는 갱신 주기와 연산 무게가 다릅니다. 둘을 한 경로에 태우지 않고 **Kafka 토픽을 나눠 배치 경로와 실시간 경로로 이원화**했고, 전체를 수집 → 버퍼 → 저장 → 처리 → 서빙 → 모니터링 → 표현의 7계층으로 구성했습니다.
 
@@ -72,7 +146,7 @@
 
 > 처음에는 단일 배치로 처리했지만 병목과 뉴스 지연이 생겨, 무거운 연산이 필요한 정적 공시 데이터는 배치에, 지연이 곧 품질인 뉴스는 스트리밍에 맡기는 구조로 다시 설계했습니다.
 
-### ♻️ 라이브 데모 개편 (2026.08)
+#### ♻️ 라이브 데모 개편 (2026.08)
 
 전체 빅데이터 파이프라인은 무료 호스팅으로 상시 운영이 불가능해, **웹 레이어(Vue + Django + PostgreSQL)만 분리 배포**하고 파이프라인 산출물은 시드 데이터로 대체하는 데모 구성을 추가했습니다.
 
@@ -92,7 +166,21 @@ frontend-pjt/dist         backend-pjt                  demo 스키마+시드
 
 ---
 
-## 🔀 배치 · 스트림 이원화 파이프라인
+<a id="erd"></a>
+
+## 🗄️ ERD
+
+[![채권이지 관계형 DB ERD](images/ERD.png)](images/ERD.png)
+
+---
+
+<a id="technology-details"></a>
+
+## 🔬 핵심 기술
+
+<a id="-배치--스트림-이원화-파이프라인"></a>
+
+### 🔀 배치 · 스트림 이원화 파이프라인
 
 같은 Kafka에서 출발하지만 두 경로는 처리 엔진·적재 방식·장애 대비가 다릅니다.
 
@@ -107,9 +195,9 @@ frontend-pjt/dist         backend-pjt                  demo 스키마+시드
 
 **채권 풀 파이프라인 DAG 순서:** `collect_api_to_kafka` → `spark_kafka_to_hdfs` → `spark_hdfs_to_postgres` → `ingest_option_cashflow_details` · `ingest_daily_market_data` → `verify_db_load` → `hdfs_cleanup_task`
 
----
+<a id="-데이터-규모와-실측"></a>
 
-## 📊 데이터 규모와 실측
+### 📊 데이터 규모와 실측
 
 | 단계 | 결과 |
 |---|---|
@@ -120,84 +208,40 @@ frontend-pjt/dist         backend-pjt                  demo 스키마+시드
 | **저장 공간** | 압축 포맷 적용과 메모리 내 중복 사전 필터링으로 **70% 절약** |
 | **관계형 DB** | 테이블 **17종** — 채권 마스터 · 현금흐름 · 옵션 · 시세, 뉴스 Staging/정규화, 용어 사전, 포트폴리오 |
 
-<p align="center">
-  <img src="images/ERD.png" alt="채권이지 관계형 DB ERD" width="100%"/>
-</p>
+<a id="-트러블-슈팅"></a>
 
----
+### 💥 트러블 슈팅
 
-## 🛠️ 기술 스택
-
-| 영역 | 스택 |
-|---|---|
-| **프론트엔드** | <img src="https://img.shields.io/badge/Vue_3-4FC08D?style=flat-square&logo=vuedotjs&logoColor=white"/> <img src="https://img.shields.io/badge/Vite-646CFF?style=flat-square&logo=vite&logoColor=white"/> <img src="https://img.shields.io/badge/Pinia-FFD859?style=flat-square&logo=pinia&logoColor=black"/> |
-| **백엔드** | <img src="https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white"/> <img src="https://img.shields.io/badge/Django_5.2-092E20?style=flat-square&logo=django&logoColor=white"/> <img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white"/> <img src="https://img.shields.io/badge/Elasticsearch-005571?style=flat-square&logo=elasticsearch&logoColor=white"/> <img src="https://img.shields.io/badge/Logstash-005571?style=flat-square&logo=logstash&logoColor=white"/> |
-| **데이터 파이프라인** | <img src="https://img.shields.io/badge/Apache_Kafka-231F20?style=flat-square&logo=apachekafka&logoColor=white"/> <img src="https://img.shields.io/badge/Apache_Spark_3.5-E25A1C?style=flat-square&logo=apachespark&logoColor=white"/> <img src="https://img.shields.io/badge/Apache_Flink_1.20-E6526F?style=flat-square&logo=apacheflink&logoColor=white"/> <img src="https://img.shields.io/badge/Apache_Airflow-017CEE?style=flat-square&logo=apacheairflow&logoColor=white"/> <img src="https://img.shields.io/badge/Hadoop_HDFS-66CCFF?style=flat-square&logo=apachehadoop&logoColor=black"/> |
-| **AI** | <img src="https://img.shields.io/badge/Google_Gemini-8E75B2?style=flat-square&logo=googlegemini&logoColor=white"/> langchain-google-genai (챗봇 · 뉴스 요약) |
-| **인프라 · 모니터링** | <img src="https://img.shields.io/badge/Docker_Compose-2496ED?style=flat-square&logo=docker&logoColor=white"/> <img src="https://img.shields.io/badge/Prometheus-E6522C?style=flat-square&logo=prometheus&logoColor=white"/> <img src="https://img.shields.io/badge/Grafana-F46800?style=flat-square&logo=grafana&logoColor=white"/> <img src="https://img.shields.io/badge/Kibana-005571?style=flat-square&logo=kibana&logoColor=white"/> |
-| **데모 배포** | <img src="https://img.shields.io/badge/Cloudflare_Pages-F38020?style=flat-square&logo=cloudflarepages&logoColor=white"/> <img src="https://img.shields.io/badge/Render-000000?style=flat-square&logo=render&logoColor=white"/> Neon PostgreSQL |
-
----
-
-## 💥 트러블 슈팅
-
-### 1. 뉴스 지연 해소
+#### 1. 뉴스 지연 해소
 * **현상:** 모든 데이터를 하나의 배치로 처리해 뉴스가 화면에 늦게 반영.
 * **원인:** 하루 한 번 갱신되는 공시와 수시로 들어오는 뉴스가 같은 경로와 주기를 공유.
 * **해결:** Kafka 토픽을 나누고 공시는 Airflow + Spark 배치, 뉴스는 Flink 스트리밍으로 분리.
 
-### 2. 스트림 수집 속도 개선
+#### 2. 스트림 수집 속도 개선
 * **현상:** 스트림 처리 중 DB 조인과 중복 검사를 함께 수행해 수집 속도 저하.
 * **원인:** 스트림 엔진이 레코드마다 DB를 조회.
 * **해결:** Flink는 Staging 테이블 인서트만 맡고 정규화와 중복 검증은 DB 트리거에 위임. 압축 저장과 중복 사전 제거로 저장 공간 **70% 절약**. ([상세 문서](docs/troubleshooting_staging_vs_normalized.md))
 
-### 3. 장애 복구 지점 확보
+#### 3. 장애 복구 지점 확보
 * **현상:** 파이프라인이 중간에 멈추면 재시작 시 유실이나 중복 적재 위험.
 * **해결:** Kafka 오프셋과 HDFS 체크포인트로 중단 지점부터 재개. 뉴스는 DB와 HDFS에 동시 적재.
 
-### 4. 소형 파일 문제 해결
+#### 4. 소형 파일 문제 해결
 * **현상:** 실시간 적재로 HDFS에 작은 파일이 대량 생성되어 네임노드에 부하.
 * **해결:** 100MB 단위로 버퍼링한 뒤 병합해 쓰도록 변경.
 
-### 5. 검색 동기화 부하 해소
+#### 5. 검색 동기화 부하 해소
 * **현상:** Logstash가 DB를 전체 조회해 Elasticsearch를 동기화.
 * **해결:** `updated_at`을 추적해 5분마다 변경분만 가져오는 증분 추출로 전환.
 
 ---
 
-## 📂 디렉터리 구조
+<a id="getting-started"></a>
 
-```text
-Bond-EZ/
-├── backend-pjt/                   # Django REST API
-│   ├── apps/                      # 도메인 앱 — accounts·bonds·chat·glossary·indicators·news·portfolios·search·common
-│   ├── config/                    # Django 설정
-│   └── deploy/                    # 라이브 데모용 스키마·시드 SQL
-├── frontend-pjt/                  # Vue 3 + Vite 프론트엔드
-│   └── src/
-│       ├── api/                   # 백엔드 통신 래퍼·캐시 모듈
-│       ├── components/            # 공통 UI (내비게이션·플로팅 챗봇)
-│       └── pages/                 # 화면 단위 컴포넌트 (홈·시세·상세·비교·지표·뉴스·사전·가이드)
-├── data-pjt/                      # 데이터 파이프라인
-│   ├── airflow/dags/              # 채권 풀 파이프라인 DAG · 금리 수집 DAG · 세부 태스크
-│   ├── flink/                     # 실시간 뉴스 듀얼 싱크 적재 (PyFlink)
-│   ├── producer/                  # 뉴스 크롤러 · ECOS/FRED 금리 수집기
-│   ├── glossary/                  # 경제금융용어 PDF 파싱·적재
-│   ├── logstash/                  # DB → Elasticsearch 증분 동기화 파이프라인
-│   └── postgres/                  # DB 스키마 · 정규화 프로시저·트리거
-├── monitoring/                    # Prometheus · Grafana 설정
-├── docs/                          # 시작 가이드 · 운영 가이드 · 파이프라인 요약 · 챗봇 명세
-├── images/                        # 아키텍처 다이어그램 · ERD
-├── docker-compose.yml             # 웹 서비스 (Django · Vue · Elasticsearch · Kibana · Logstash)
-├── docker-compose-data.yml        # 데이터 파이프라인 (Kafka · Hadoop · Spark · Flink · Airflow)
-├── docker-compose-monitoring.yml  # 관제 (Prometheus · Grafana)
-├── docker-compose.demo.yml        # 웹 데모 스택 (Vue + Django + Postgres, 시드 자동 적재)
-└── service.sh · data.sh · monitoring.sh   # 영역별 구동 스크립트
-```
+## 🚀 개발자 가이드
 
----
-
-## 🚀 실행 방법
+<details>
+<summary><strong>소스에서 실행하고 테스트하기</strong></summary>
 
 **요구 사항:** Docker Desktop · (전체 파이프라인) 공공데이터포털 인증키 · (AI 기능) Gemini API 키
 
@@ -230,9 +274,59 @@ sh monitoring.sh up      # 관제 — Prometheus·Grafana (선택)
 
 최초 적재는 Airflow 콘솔(http://localhost:8081, 로컬 기본 계정 `admin` / `admin`)에서 `bond_full_pipeline_dag`를 켜고 한 번 수동 실행합니다. 단계별 절차와 적재 검증 SQL, 서비스별 포트는 [운영 가이드](docs/OPERATIONS_GUIDE.md)에 있습니다.
 
+</details>
+
 ---
 
-## 📚 문서
+<a id="directory-structure"></a>
+
+## 📁 디렉터리 구조
+
+<details>
+<summary><strong>주요 디렉터리 보기</strong></summary>
+
+```text
+Bond-EZ/
+├── backend-pjt/                   # Django REST API
+│   ├── apps/                      # 도메인 앱 — accounts·bonds·chat·glossary·indicators·news·portfolios·search·common
+│   ├── config/                    # Django 설정
+│   └── deploy/                    # 라이브 데모용 스키마·시드 SQL
+├── frontend-pjt/                  # Vue 3 + Vite 프론트엔드
+│   └── src/
+│       ├── api/                   # 백엔드 통신 래퍼·캐시 모듈
+│       ├── components/            # 공통 UI (내비게이션·플로팅 챗봇)
+│       └── pages/                 # 화면 단위 컴포넌트 (홈·시세·상세·비교·지표·뉴스·사전·가이드)
+├── data-pjt/                      # 데이터 파이프라인
+│   ├── airflow/dags/              # 채권 풀 파이프라인 DAG · 금리 수집 DAG · 세부 태스크
+│   ├── flink/                     # 실시간 뉴스 듀얼 싱크 적재 (PyFlink)
+│   ├── producer/                  # 뉴스 크롤러 · ECOS/FRED 금리 수집기
+│   ├── glossary/                  # 경제금융용어 PDF 파싱·적재
+│   ├── logstash/                  # DB → Elasticsearch 증분 동기화 파이프라인
+│   └── postgres/                  # DB 스키마 · 정규화 프로시저·트리거
+├── monitoring/                    # Prometheus · Grafana 설정
+├── docs/                          # 시작 가이드 · 운영 가이드 · 파이프라인 요약 · 챗봇 명세
+├── images/                        # 아키텍처 다이어그램 · ERD
+├── docker-compose.yml             # 웹 서비스 (Django · Vue · Elasticsearch · Kibana · Logstash)
+├── docker-compose-data.yml        # 데이터 파이프라인 (Kafka · Hadoop · Spark · Flink · Airflow)
+├── docker-compose-monitoring.yml  # 관제 (Prometheus · Grafana)
+├── docker-compose.demo.yml        # 웹 데모 스택 (Vue + Django + Postgres, 시드 자동 적재)
+└── service.sh · data.sh · monitoring.sh   # 영역별 구동 스크립트
+```
+
+</details>
+
+---
+
+<a id="project-guide"></a>
+
+## 📚 프로젝트 문서와 협업 규칙
+
+<details>
+<summary><strong>문서와 협업 규칙 보기</strong></summary>
+
+<a id="-문서"></a>
+
+### 📚 문서
 
 | 문서 | 내용 |
 |---|---|
@@ -243,9 +337,13 @@ sh monitoring.sh up      # 관제 — Prometheus·Grafana (선택)
 | [chatbot_chain_spec.md](docs/chatbot_chain_spec.md) · [chatbot_internal_logic.md](docs/chatbot_internal_logic.md) | AI 챗봇 처리 체인 · 내부 로직 |
 | [project_plan.md](docs/project_plan.md) | 프로젝트 기획서 |
 
-## 데이터 출처
+<a id="데이터-출처"></a>
+
+### 데이터 출처
 
 - [공공데이터포털](https://www.data.go.kr) (금융위원회) — 채권기본정보 · 채권권리일정정보 · 채권권리행사정보 · 채권시세정보, 한국예탁결제원 채권정보서비스(장애 대비 백업)
 - 금리 지표 — 한국은행 ECOS · FRED
 - 뉴스 — [네이버 금융 주요뉴스](https://finance.naver.com/news/mainnews.naver) · [연합인포맥스](https://news.einfomax.co.kr)
 - 용어 사전 — 한국은행 「경제금융용어 800선」
+
+</details>
